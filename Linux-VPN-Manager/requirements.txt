@@ -1,5 +1,32 @@
+
+# Core GUI framework
+PyQt6>=6.4.0
+
+# Optional dependencies for enhanced functionality
+psutil>=5.9.0  # For system monitoring and statistics
+pydbus>=1.0.0  # For D-Bus integration (KDE notifications)
+Pillow>=9.0.0  # For image processing (icon handling)
+
+# Optional: For development/testing
+pytest>=7.0.0
+pytest-qt>=4.0.0
+=======
 # VPN Manager - Python Dependencies
 # ================================
+
+# Core GUI framework
+PyQt6>=6.4.0
+
+# Optional dependencies for enhanced functionality
+psutil>=5.9.0  # For system monitoring and statistics
+pydbus>=1.0.0  # For D-Bus integration (KDE notifications)
+Pillow>=9.0.0  # For image processing (icon handling)
+matplotlib>=3.5.0  # For statistics charts and graphs
+packaging>=21.0  # For version comparison in dependency checker
+
+# Optional: For development/testing
+pytest>=7.0.0
+pytest-qt>=4.0.0================================
 
 # Core GUI framework
 PyQt6>=6.4.0

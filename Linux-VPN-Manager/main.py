@@ -18,12 +18,15 @@ from PyQt6.QtGui import QIcon
 from frontend.main_window import MainWindow
 from frontend.tray_icon import SystemTrayIcon
 from frontend.theme_manager import get_theme_manager
+from frontend.stats_chart import StatsChart
 from backend.vpn_handler import VPNHandler
 from backend.log_manager import LogManager
 from backend.config_manager import ConfigManager
 from backend.stats_manager import get_stats_manager
 from backend.notification_manager import get_notification_manager
 from backend.de_manager import get_de_manager
+from backend.dependency_checker import DependencyChecker
+from backend.history_manager import HistoryManager
 
 
 class VPNManager:
@@ -44,8 +47,18 @@ class VPNManager:
         self.config_manager = ConfigManager()
         self.log_manager = LogManager()
         self.stats_manager = get_stats_manager()
+        
+        # Initialize new managers
+        self.dependency_checker = DependencyChecker()
+        self.history_manager = HistoryManager()
+        self.stats_chart = StatsChart()
+        
         self.vpn_handler = VPNHandler(
-            self.config_manager, self.log_manager, self.stats_manager
+            self.config_manager, 
+            self.log_manager, 
+            self.stats_manager,
+            self.history_manager,
+            self.notification_manager
         )
 
         # Initialize DE-specific managers
@@ -56,6 +69,9 @@ class VPNManager:
         self.theme_manager = get_theme_manager(self.app)
         self.theme_manager.apply_theme(self.app)
 
+        # Check dependencies and show warnings if needed
+        self._check_dependencies()
+
         # Initialize frontend
         self.main_window = MainWindow(
             self.vpn_handler,
@@ -64,6 +80,9 @@ class VPNManager:
             self.stats_manager,
             self.theme_manager,
             self.notification_manager,
+            self.history_manager,
+            self.stats_chart,
+            self.dependency_checker,
         )
         self.tray_icon = SystemTrayIcon(
             self.vpn_handler,
@@ -125,6 +144,21 @@ class VPNManager:
 
         return None
 
+    def _check_dependencies(self):
+        """Check for required dependencies and show warnings if missing."""
+        try:
+            missing = self.dependency_checker.get_missing_dependencies()
+            if missing:
+                self.logger.warning(f"Missing required dependencies: {[d['name'] for d in missing]}")
+                # Show warning in tray icon tooltip
+                if self.tray_icon:
+                    missing_names = ", ".join([d["description"] for d in missing])
+                    self.tray_icon.setToolTip(
+                        f"VPN Manager\nWarning: Missing dependencies - {missing_names}"
+                    )
+        except Exception as e:
+            self.logger.error(f"Error checking dependencies: {str(e)}")
+
     def _setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown."""
         signal.signal(signal.SIGINT, self._handle_signal)
@@ -145,6 +179,10 @@ class VPNManager:
         
         # Stop stats monitoring
         self.stats_manager.stop_all_monitoring()
+        
+        # Close matplotlib figures
+        if self.stats_chart:
+            self.stats_chart.close_all_figures()
 
     def run(self):
         """Run the application."""

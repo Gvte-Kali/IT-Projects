@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QFormLayout,
     QComboBox,
+    QLineEdit,
+    QTextEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer, QSettings
 from PyQt6.QtGui import QIcon, QAction, QFont
@@ -37,7 +39,9 @@ class SignalEmitter(QObject):
 class MainWindow(QMainWindow):
     """Main application window for VPN Manager."""
 
-    def __init__(self, vpn_handler, config_manager, log_manager, stats_manager=None, theme_manager=None, notification_manager=None):
+    def __init__(self, vpn_handler, config_manager, log_manager, stats_manager=None, 
+                 theme_manager=None, notification_manager=None, history_manager=None,
+                 stats_chart=None, dependency_checker=None):
         """
         Initialize the main window.
 
@@ -48,6 +52,9 @@ class MainWindow(QMainWindow):
             stats_manager: StatsManager instance (optional)
             theme_manager: ThemeManager instance (optional)
             notification_manager: NotificationManager instance (optional)
+            history_manager: HistoryManager instance (optional)
+            stats_chart: StatsChart instance (optional)
+            dependency_checker: DependencyChecker instance (optional)
         """
         super().__init__()
         self.vpn_handler = vpn_handler
@@ -56,6 +63,9 @@ class MainWindow(QMainWindow):
         self.stats_manager = stats_manager
         self.theme_manager = theme_manager
         self.notification_manager = notification_manager
+        self.history_manager = history_manager
+        self.stats_chart = stats_chart
+        self.dependency_checker = dependency_checker
         self.logger = logging.getLogger("MainWindow")
 
         # Set up window properties
@@ -74,6 +84,11 @@ class MainWindow(QMainWindow):
 
         # Create signal emitter for cross-widget communication
         self.signal_emitter = SignalEmitter()
+
+        # Register callbacks with VPN handler
+        if self.vpn_handler is not None:
+            self.vpn_handler.register_status_callback(self._on_connection_status_change)
+            self.vpn_handler.register_dns_leak_callback(self._on_dns_leak_detected)
 
         # Initialize UI
         self._init_ui()
@@ -113,6 +128,10 @@ class MainWindow(QMainWindow):
             self.stats_tab = QWidget()
             self._init_stats_tab()
             self.tab_widget.addTab(self.stats_tab, "Statistics")
+        
+        # Create history tab if history_manager is available
+        if self.history_manager is not None:
+            self._init_history_tab()
 
         # Status label
         self.status_label = QLabel("Ready")
@@ -124,9 +143,13 @@ class MainWindow(QMainWindow):
 
     def _init_connections_tab(self):
         """Initialize the connections tab."""
-        layout = QVBoxLayout(self.connections_tab)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        # Store layout reference for search bar insertion
+        self.connections_tab_layout = QVBoxLayout(self.connections_tab)
+        self.connections_tab_layout.setContentsMargins(0, 0, 0, 0)
+        self.connections_tab_layout.setSpacing(10)
+
+        # Initialize search bar
+        self._init_search_bar()
 
         # Create connection list
         self.connection_list = QListWidget()
@@ -136,7 +159,7 @@ class MainWindow(QMainWindow):
         )
         self.connection_list.itemDoubleClicked.connect(self.on_connection_double_clicked)
         self.connection_list.itemSelectionChanged.connect(self._update_button_states)
-        layout.addWidget(self.connection_list)
+        self.connections_tab_layout.addWidget(self.connection_list)
 
         # Create button layout
         button_layout = QHBoxLayout()
@@ -197,6 +220,24 @@ class MainWindow(QMainWindow):
 
         global_group.setLayout(global_layout)
         layout.addWidget(global_group)
+
+        # DNS Leak Status
+        dns_group = QGroupBox("DNS Leak Detection")
+        dns_layout = QVBoxLayout()
+        
+        self.dns_leak_label = QLabel("No DNS leaks detected")
+        self.dns_leak_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        self.dns_leak_label.setWordWrap(True)
+        dns_layout.addWidget(self.dns_leak_label)
+        
+        # DNS check button
+        if self.vpn_handler is not None:
+            check_dns_button = QPushButton("Check DNS Leak Status")
+            check_dns_button.clicked.connect(self._check_all_dns_leaks)
+            dns_layout.addWidget(check_dns_button)
+        
+        dns_group.setLayout(dns_layout)
+        layout.addWidget(dns_group)
 
         # Per-connection stats group
         connection_group = QGroupBox("Connection Statistics")
@@ -780,6 +821,375 @@ class MainWindow(QMainWindow):
                 urgency=self.notification_manager.URGENCY_NORMAL,
                 timeout=5000,
             )
+
+    # =========================================================================
+    # Callback Methods for VPN Handler
+    # =========================================================================
+
+    def _on_connection_status_change(self, connection_name: str, status: str) -> None:
+        """
+        Callback for connection status changes.
+        
+        Args:
+            connection_name: Name of the connection
+            status: New status (connecting, connected, failed, disconnected, timeout)
+        """
+        try:
+            self.logger.info(f"Connection status changed: {connection_name} -> {status}")
+            
+            # Update UI on the main thread
+            QTimer.singleShot(0, lambda: self._update_connection_status_ui(connection_name, status))
+        except Exception as e:
+            self.logger.error(f"Error in status change callback: {str(e)}")
+
+    def _update_connection_status_ui(self, connection_name: str, status: str) -> None:
+        """
+        Update UI based on connection status change.
+        
+        Args:
+            connection_name: Name of the connection
+            status: New status
+        """
+        try:
+            # Find the connection item in the list
+            for i in range(self.connections_list.count()):
+                item = self.connections_list.item(i)
+                if item is not None and item.data(Qt.UserRole) == connection_name:
+                    # Update icon based on status
+                    icon_name = self._get_status_icon(status)
+                    icon_path = self._get_icon_path(icon_name)
+                    if icon_path:
+                        item.setIcon(QIcon(str(icon_path)))
+                    
+                    # Update text
+                    item.setText(f"{connection_name} ({status})")
+                    
+                    # Update button states
+                    self._update_connection_buttons()
+                    break
+            
+            # Update status label
+            self.status_label.setText(f"Status: {connection_name} - {status}")
+            
+            # Refresh stats display
+            if self.stats_manager is not None:
+                self._update_stats_display()
+            
+            # Refresh history display if visible
+            if hasattr(self, 'history_tab') and self.tab_widget.currentWidget() == self.history_tab:
+                self._update_history_display()
+                
+        except Exception as e:
+            self.logger.error(f"Error updating connection status UI: {str(e)}")
+
+    def _get_status_icon(self, status: str) -> str:
+        """
+        Get icon name based on connection status.
+        
+        Args:
+            status: Connection status
+            
+        Returns:
+            Icon filename
+        """
+        status_icons = {
+            "connecting": "yellow.png",
+            "connected": "green.png",
+            "disconnected": "red.png",
+            "failed": "red.png",
+            "timeout": "red.png",
+        }
+        return status_icons.get(status, "red.png")
+
+    def _on_dns_leak_detected(self, connection_name: str, dns_ips: List[str]) -> None:
+        """
+        Callback for DNS leak detection.
+        
+        Args:
+            connection_name: Name of the connection with DNS leak
+            dns_ips: List of DNS server IPs that caused the leak
+        """
+        try:
+            self.logger.warning(f"DNS leak detected for {connection_name}: {dns_ips}")
+            
+            # Update UI on the main thread
+            QTimer.singleShot(0, lambda: self._update_dns_leak_ui(connection_name, dns_ips))
+        except Exception as e:
+            self.logger.error(f"Error in DNS leak callback: {str(e)}")
+
+    def _update_dns_leak_ui(self, connection_name: str, dns_ips: List[str]) -> None:
+        """
+        Update UI to show DNS leak warning.
+        
+        Args:
+            connection_name: Name of the connection
+            dns_ips: List of DNS server IPs
+        """
+        try:
+            # Update status label with DNS leak warning
+            current_text = self.status_label.text()
+            if "DNS LEAK" not in current_text:
+                self.status_label.setText(
+                    f"{current_text} - ⚠️ DNS LEAK: {', '.join(dns_ips)}"
+                )
+            
+            # Update connection item in list
+            for i in range(self.connections_list.count()):
+                item = self.connections_list.item(i)
+                if item is not None and item.data(Qt.UserRole) == connection_name:
+                    # Add DNS leak indicator to text
+                    current_text = item.text()
+                    if "DNS LEAK" not in current_text:
+                        item.setText(f"{current_text} - ⚠️ DNS LEAK")
+                    break
+            
+            # Update stats display to show DNS leak
+            if hasattr(self, 'dns_leak_label'):
+                self.dns_leak_label.setText(f"⚠️ DNS Leak Detected: {', '.join(dns_ips)}")
+                self.dns_leak_label.setStyleSheet("color: #ff5555; font-weight: bold;")
+            
+            # Refresh stats display
+            if self.stats_manager is not None:
+                self._update_stats_display()
+                
+        except Exception as e:
+            self.logger.error(f"Error updating DNS leak UI: {str(e)}")
+
+    # =========================================================================
+    # Search Functionality
+    # =========================================================================
+
+    def _init_search_bar(self):
+        """Initialize the search bar for filtering connections."""
+        try:
+            # Create search layout
+            search_layout = QHBoxLayout()
+            
+            # Search label
+            search_label = QLabel("Search:")
+            search_layout.addWidget(search_label)
+            
+            # Search input
+            self.search_input = QLineEdit()
+            self.search_input.setPlaceholderText("Filter connections...")
+            self.search_input.textChanged.connect(self._filter_connections)
+            search_layout.addWidget(self.search_input)
+            
+            # Clear button
+            clear_button = QPushButton("Clear")
+            clear_button.clicked.connect(self._clear_search)
+            search_layout.addWidget(clear_button)
+            
+            # Add search layout to connections tab
+            if hasattr(self, 'connections_tab_layout'):
+                self.connections_tab_layout.insertLayout(0, search_layout)
+                
+        except Exception as e:
+            self.logger.error(f"Error initializing search bar: {str(e)}")
+
+    def _filter_connections(self, text: str) -> None:
+        """
+        Filter connections based on search text.
+        
+        Args:
+            text: Search text
+        """
+        try:
+            search_text = text.lower()
+            
+            for i in range(self.connections_list.count()):
+                item = self.connections_list.item(i)
+                if item is None:
+                    continue
+                
+                connection_name = item.data(Qt.UserRole)
+                if connection_name is None:
+                    continue
+                
+                # Show/hide items based on search
+                if search_text in connection_name.lower():
+                    item.setHidden(False)
+                else:
+                    item.setHidden(True)
+                    
+        except Exception as e:
+            self.logger.error(f"Error filtering connections: {str(e)}")
+
+    def _clear_search(self) -> None:
+        """Clear the search filter."""
+        try:
+            self.search_input.clear()
+            
+            # Show all items
+            for i in range(self.connections_list.count()):
+                item = self.connections_list.item(i)
+                if item is not None:
+                    item.setHidden(False)
+                    
+        except Exception as e:
+            self.logger.error(f"Error clearing search: {str(e)}")
+
+    # =========================================================================
+    # History Display Methods
+    # =========================================================================
+
+    def _init_history_tab(self):
+        """Initialize the history tab."""
+        try:
+            if self.history_manager is None:
+                return
+            
+            # Create history tab
+            self.history_tab = QWidget()
+            self.tab_widget.addTab(self.history_tab, "History")
+            
+            # Create layout
+            history_layout = QVBoxLayout(self.history_tab)
+            history_layout.setContentsMargins(10, 10, 10, 10)
+            history_layout.setSpacing(10)
+            
+            # Create history display
+            self.history_text = QTextEdit()
+            self.history_text.setReadOnly(True)
+            history_layout.addWidget(self.history_text)
+            
+            # Update display
+            self._update_history_display()
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing history tab: {str(e)}")
+
+    def _update_history_display(self) -> None:
+        """Update the history display."""
+        try:
+            if not hasattr(self, 'history_text') or self.history_manager is None:
+                return
+            
+            # Get all statistics
+            stats = self.history_manager.get_all_statistics()
+            global_stats = self.history_manager.get_global_statistics()
+            
+            # Build display text
+            text = "<h2>Connection History</h2>\n\n"
+            
+            # Global statistics
+            text += "<h3>Global Statistics</h3>\n"
+            text += f"<b>Total Connections:</b> {global_stats['total_connections']}\n"
+            text += f"<b>Total Sessions:</b> {global_stats['total_sessions']}\n"
+            text += f"<b>Successful Sessions:</b> {global_stats['successful_sessions']}\n"
+            text += f"<b>Failed Sessions:</b> {global_stats['failed_sessions']}\n"
+            text += f"<b>Overall Success Rate:</b> {global_stats['overall_success_rate']:.1f}%\n"
+            text += f"<b>Total Duration:</b> {self._format_duration(global_stats['total_duration'])}\n"
+            text += f"<b>Total Data Sent:</b> {self._format_bytes(global_stats['total_bytes_sent'])}\n"
+            text += f"<b>Total Data Received:</b> {self._format_bytes(global_stats['total_bytes_received'])}\n\n"
+            
+            # Per-connection statistics
+            text += "<h3>Per-Connection Statistics</h3>\n"
+            for conn_name, conn_stats in stats.items():
+                text += f"<h4>{conn_name}</h4>\n"
+                text += f"  <b>Sessions:</b> {conn_stats['total_sessions']}\n"
+                text += f"  <b>Success Rate:</b> {conn_stats['success_rate']:.1f}%\n"
+                text += f"  <b>Total Duration:</b> {self._format_duration(conn_stats['total_duration'])}\n"
+                text += f"  <b>Avg Duration:</b> {self._format_duration(conn_stats['avg_duration'])}\n"
+                text += f"  <b>Data Sent:</b> {self._format_bytes(conn_stats['total_bytes_sent'])}\n"
+                text += f"  <b>Data Received:</b> {self._format_bytes(conn_stats['total_bytes_received'])}\n"
+                text += f"  <b>Last Connection:</b> {conn_stats['last_connection'] or 'Never'}\n\n"
+            
+            # DNS Leak Status
+            text += "<h3>DNS Leak Status</h3>\n"
+            for conn_name in self.vpn_handler.active_connections.keys():
+                dns_status = self.vpn_handler.get_dns_status(conn_name)
+                if dns_status['leak_detected']:
+                    text += f"<b style='color: red;'>{conn_name}:</b> DNS Leak Detected - {', '.join(dns_status['dns_ips'])}\n"
+                else:
+                    text += f"<b style='color: green;'>{conn_name}:</b> No DNS Leak\n"
+            
+            self.history_text.setHtml(text)
+            
+        except Exception as e:
+            self.logger.error(f"Error updating history display: {str(e)}")
+
+    def _format_duration(self, seconds: float) -> str:
+        """
+        Format duration in seconds to human-readable format.
+        
+        Args:
+            seconds: Duration in seconds
+            
+        Returns:
+            Formatted string
+        """
+        try:
+            if seconds < 60:
+                return f"{seconds:.1f}s"
+            elif seconds < 3600:
+                minutes = seconds / 60
+                return f"{minutes:.1f}m"
+            else:
+                hours = seconds / 3600
+                return f"{hours:.1f}h"
+        except Exception:
+            return "0s"
+
+    def _format_bytes(self, bytes_val: int) -> str:
+        """
+        Format bytes to human-readable format.
+        
+        Args:
+            bytes_val: Number of bytes
+            
+        Returns:
+            Formatted string
+        """
+        try:
+            if bytes_val < 1024:
+                return f"{bytes_val}B"
+            elif bytes_val < 1024 * 1024:
+                kb = bytes_val / 1024
+                return f"{kb:.1f}KB"
+            elif bytes_val < 1024 * 1024 * 1024:
+                mb = bytes_val / (1024 * 1024)
+                return f"{mb:.1f}MB"
+            else:
+                gb = bytes_val / (1024 * 1024 * 1024)
+                return f"{gb:.1f}GB"
+        except Exception:
+            return "0B"
+
+    def _check_all_dns_leaks(self) -> None:
+        """Check DNS leak status for all active connections."""
+        try:
+            if self.vpn_handler is None:
+                return
+            
+            active_connections = self.vpn_handler.get_all_connections_info()
+            
+            if not active_connections:
+                self.dns_leak_label.setText("No active connections to check")
+                self.dns_leak_label.setStyleSheet("color: #666;")
+                return
+            
+            # Check DNS for each active connection
+            leak_detected = False
+            leak_info = []
+            
+            for conn_name in active_connections.keys():
+                dns_status = self.vpn_handler.get_dns_status(conn_name)
+                if dns_status['leak_detected']:
+                    leak_detected = True
+                    leak_info.append(f"{conn_name}: {', '.join(dns_status['dns_ips'])}")
+            
+            if leak_detected:
+                self.dns_leak_label.setText("⚠️ DNS Leaks Detected:\n" + "\n".join(leak_info))
+                self.dns_leak_label.setStyleSheet("color: #ff5555; font-weight: bold;")
+            else:
+                self.dns_leak_label.setText("✅ No DNS leaks detected")
+                self.dns_leak_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+                
+        except Exception as e:
+            self.logger.error(f"Error checking DNS leaks: {str(e)}")
+            self.dns_leak_label.setText(f"Error checking DNS: {str(e)}")
+            self.dns_leak_label.setStyleSheet("color: #ff5555;")
 
     def closeEvent(self, event):
         """Handle window close event."""
