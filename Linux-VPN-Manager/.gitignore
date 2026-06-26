@@ -51,5 +51,6 @@ Thumbs.db
 *.tar.gz
 *.zip
 
-# Assets (if generated)
-assets/
+# Generated assets (keep SVG icons in repo)
+assets/*.png
+assets/*.jpg

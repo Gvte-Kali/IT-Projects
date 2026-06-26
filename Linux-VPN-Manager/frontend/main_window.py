@@ -15,9 +15,13 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QInputDialog,
     QMenu,
+    QTabWidget,
+    QGroupBox,
+    QFormLayout,
+    QComboBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
-from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
+from PyQt6.QtGui import QIcon, QAction, QFont
 from typing import Optional
 import logging
 
@@ -31,7 +35,7 @@ class SignalEmitter(QObject):
 class MainWindow(QMainWindow):
     """Main application window for VPN Manager."""
 
-    def __init__(self, vpn_handler, config_manager, log_manager):
+    def __init__(self, vpn_handler, config_manager, log_manager, stats_manager=None, theme_manager=None, notification_manager=None):
         """
         Initialize the main window.
 
@@ -39,17 +43,23 @@ class MainWindow(QMainWindow):
             vpn_handler: VPNHandler instance
             config_manager: ConfigManager instance
             log_manager: LogManager instance
+            stats_manager: StatsManager instance (optional)
+            theme_manager: ThemeManager instance (optional)
+            notification_manager: NotificationManager instance (optional)
         """
         super().__init__()
         self.vpn_handler = vpn_handler
         self.config_manager = config_manager
         self.log_manager = log_manager
+        self.stats_manager = stats_manager
+        self.theme_manager = theme_manager
+        self.notification_manager = notification_manager
         self.logger = logging.getLogger("MainWindow")
 
         # Set up window properties
         self.setWindowTitle("VPN Manager")
-        self.setGeometry(100, 100, 600, 500)
-        self.setMinimumSize(500, 400)
+        self.setGeometry(100, 100, 700, 550)
+        self.setMinimumSize(600, 500)
 
         # Create signal emitter for cross-widget communication
         self.signal_emitter = SignalEmitter()
@@ -63,6 +73,12 @@ class MainWindow(QMainWindow):
         # Load connections
         self.refresh_connections()
 
+        # Set up stats update timer
+        if self.stats_manager is not None:
+            self.stats_timer = QTimer()
+            self.stats_timer.timeout.connect(self._update_stats_display)
+            self.stats_timer.start(1000)  # Update stats every second
+
     def _init_ui(self):
         """Initialize the user interface."""
         # Create central widget and layout
@@ -70,6 +86,35 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+
+        # Create tab widget
+        self.tab_widget = QTabWidget()
+        layout.addWidget(self.tab_widget)
+
+        # Create connections tab
+        self.connections_tab = QWidget()
+        self._init_connections_tab()
+        self.tab_widget.addTab(self.connections_tab, "Connections")
+
+        # Create statistics tab if stats_manager is available
+        if self.stats_manager is not None:
+            self.stats_tab = QWidget()
+            self._init_stats_tab()
+            self.tab_widget.addTab(self.stats_tab, "Statistics")
+
+        # Status label
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet("color: #666;")
+        layout.addWidget(self.status_label)
+
+        # Create menu bar
+        self._create_menu_bar()
+
+    def _init_connections_tab(self):
+        """Initialize the connections tab."""
+        layout = QVBoxLayout(self.connections_tab)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
         # Create connection list
@@ -114,13 +159,50 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(button_layout)
 
-        # Status label
-        self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #666;")
-        layout.addWidget(self.status_label)
+    def _init_stats_tab(self):
+        """Initialize the statistics tab."""
+        if self.stats_manager is None:
+            return
 
-        # Create menu bar
-        self._create_menu_bar()
+        layout = QVBoxLayout(self.stats_tab)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        # Global stats group
+        global_group = QGroupBox("Global Statistics")
+        global_layout = QFormLayout()
+
+        self.global_active_label = QLabel("0")
+        self.global_total_label = QLabel("0")
+        self.global_sent_label = QLabel("0 B")
+        self.global_recv_label = QLabel("0 B")
+        self.global_errors_label = QLabel("0")
+
+        global_layout.addRow("Active Connections:", self.global_active_label)
+        global_layout.addRow("Total Connections:", self.global_total_label)
+        global_layout.addRow("Total Sent:", self.global_sent_label)
+        global_layout.addRow("Total Received:", self.global_recv_label)
+        global_layout.addRow("Total Errors:", self.global_errors_label)
+
+        global_group.setLayout(global_layout)
+        layout.addWidget(global_group)
+
+        # Per-connection stats group
+        connection_group = QGroupBox("Connection Statistics")
+        connection_layout = QVBoxLayout()
+
+        self.connection_stats_list = QListWidget()
+        self.connection_stats_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.connection_stats_list.customContextMenuRequested.connect(
+            self._show_stats_context_menu
+        )
+        connection_layout.addWidget(self.connection_stats_list)
+
+        connection_group.setLayout(connection_layout)
+        layout.addWidget(connection_group)
+
+        # Update stats display
+        self._update_stats_display()
 
     def _create_menu_bar(self):
         """Create the menu bar."""
@@ -153,6 +235,28 @@ class MainWindow(QMainWindow):
         view_logs_action = QAction("View Logs", self)
         view_logs_action.triggered.connect(self.view_logs)
         view_menu.addAction(view_logs_action)
+
+        # Theme menu (if theme_manager is available)
+        if self.theme_manager is not None:
+            theme_menu = menubar.addMenu("Theme")
+
+            light_action = QAction("Light", self)
+            light_action.triggered.connect(self._set_light_theme)
+            theme_menu.addAction(light_action)
+
+            dark_action = QAction("Dark", self)
+            dark_action.triggered.connect(self._set_dark_theme)
+            theme_menu.addAction(dark_action)
+
+            system_action = QAction("System", self)
+            system_action.triggered.connect(self._set_system_theme)
+            theme_menu.addAction(system_action)
+
+            theme_menu.addSeparator()
+
+            toggle_action = QAction("Toggle Theme", self)
+            toggle_action.triggered.connect(self._toggle_theme)
+            theme_menu.addAction(toggle_action)
 
         # Help menu
         help_menu = menubar.addMenu("Help")
@@ -212,6 +316,32 @@ class MainWindow(QMainWindow):
 
         menu.exec(self.connection_list.viewport().mapToGlobal(pos))
 
+    def _show_stats_context_menu(self, pos):
+        """Show context menu for stats list."""
+        item = self.connection_stats_list.itemAt(pos)
+        if not item:
+            return
+
+        connection_name = item.data(Qt.ItemDataRole.UserRole)
+
+        menu = QMenu(self)
+
+        # View detailed stats action
+        details_action = QAction("View Details", self)
+        details_action.triggered.connect(
+            lambda: self._show_connection_details(connection_name)
+        )
+        menu.addAction(details_action)
+
+        # Reset stats action
+        reset_action = QAction("Reset Stats", self)
+        reset_action.triggered.connect(
+            lambda: self._reset_connection_stats(connection_name)
+        )
+        menu.addAction(reset_action)
+
+        menu.exec(self.connection_stats_list.viewport().mapToGlobal(pos))
+
     def _update_button_states(self):
         """Update button enabled states based on selection."""
         selected_items = self.connection_list.selectedItems()
@@ -225,9 +355,13 @@ class MainWindow(QMainWindow):
 
         if status == "UP":
             success, message = self.vpn_handler.stop_vpn(connection_name)
+            if success and self.notification_manager is not None:
+                self.notification_manager.show_connection_disconnected(connection_name)
         else:
             config_path = self.config_manager.get_config_path(connection_name)
             success, message = self.vpn_handler.start_vpn(config_path, connection_name)
+            if success and self.notification_manager is not None:
+                self.notification_manager.show_connection_connected(connection_name)
 
         if success:
             self.refresh_connections()
@@ -237,6 +371,8 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", message)
             self.status_label.setText(f"Error: {message}")
             self.status_label.setStyleSheet("color: #dc3545;")
+            if self.notification_manager is not None:
+                self.notification_manager.show_connection_error(connection_name, message)
 
     def _get_icon_path(self, filename: str) -> Optional[str]:
         """Get the path to an icon file."""
@@ -260,7 +396,37 @@ class MainWindow(QMainWindow):
         if user_icon_path.exists():
             return str(user_icon_path)
 
+        # Try using DE manager if available
+        if self.theme_manager is not None and hasattr(self.theme_manager, 'de_manager'):
+            de_icon = self.theme_manager.de_manager.get_icon_path(filename.replace(".png", ""))
+            if de_icon:
+                return de_icon
+
         return None
+
+    def _get_status_icon(self, status: str) -> QIcon:
+        """Get the appropriate icon for a connection status."""
+        if self.theme_manager is not None:
+            # Use theme-aware icons
+            if status == "UP":
+                icon_path = self._get_icon_path("green.png")
+            elif status == "CONNECTING":
+                icon_path = self._get_icon_path("yellow.png")
+            else:
+                icon_path = self._get_icon_path("red.png")
+        else:
+            # Fallback to default icons
+            script_dir = Path(__file__).parent.parent
+            if status == "UP":
+                icon_path = script_dir / "assets" / "green.png"
+            elif status == "CONNECTING":
+                icon_path = script_dir / "assets" / "yellow.png"
+            else:
+                icon_path = script_dir / "assets" / "red.png"
+
+        if icon_path and Path(icon_path).exists():
+            return QIcon(str(icon_path))
+        return QIcon()
 
     def refresh_connections(self):
         """Refresh the connection list with current status."""
@@ -269,17 +435,7 @@ class MainWindow(QMainWindow):
 
             for name in self.config_manager.list_connections():
                 status, _ = self.vpn_handler.get_vpn_status(name)
-
-                # Get icon based on status
-                if status == "UP":
-                    icon_path = self._get_icon_path("green.png")
-                    icon = QIcon(icon_path) if icon_path else QIcon()
-                elif status == "CONNECTING":
-                    icon_path = self._get_icon_path("yellow.png")
-                    icon = QIcon(icon_path) if icon_path else QIcon()
-                else:
-                    icon_path = self._get_icon_path("red.png")
-                    icon = QIcon(icon_path) if icon_path else QIcon()
+                icon = self._get_status_icon(status)
 
                 item = QListWidgetItem(f"{name} ({status})")
                 item.setIcon(icon)
@@ -301,6 +457,132 @@ class MainWindow(QMainWindow):
         self.refresh_connections()
         self.status_label.setText("Status refreshed")
         self.status_label.setStyleSheet("color: #28a745;")
+
+    def _update_stats_display(self):
+        """Update the statistics display."""
+        if self.stats_manager is None:
+            return
+
+        try:
+            # Update global stats
+            global_stats = self.stats_manager.get_global_stats()
+            self.global_active_label.setText(str(global_stats.active_connections))
+            self.global_total_label.setText(str(global_stats.total_connections))
+            self.global_sent_label.setText(
+                self._format_bytes(global_stats.total_bytes_sent)
+            )
+            self.global_recv_label.setText(
+                self._format_bytes(global_stats.total_bytes_recv)
+            )
+            self.global_errors_label.setText(str(global_stats.total_errors))
+
+            # Update per-connection stats
+            self.connection_stats_list.clear()
+            all_stats = self.stats_manager.get_all_stats()
+
+            for name, stats in all_stats.items():
+                # Get formatted stats
+                formatted = self.stats_manager.get_formatted_stats(name)
+
+                item_text = (
+                    f"{name}: "
+                    f"↑{formatted.get('send_speed', '0 B/s')} "
+                    f"↓{formatted.get('recv_speed', '0 B/s')} | "
+                    f"Total: ↑{formatted.get('total_sent', '0 B')} ↓{formatted.get('total_recv', '0 B')}"
+                )
+
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.ItemDataRole.UserRole, name)
+                self.connection_stats_list.addItem(item)
+
+        except Exception as e:
+            self.logger.error(f"Error updating stats display: {str(e)}")
+
+    @staticmethod
+    def _format_bytes(bytes_total: int) -> str:
+        """Format bytes to human-readable string."""
+        if bytes_total < 1024:
+            return f"{bytes_total} B"
+        elif bytes_total < 1024 * 1024:
+            return f"{bytes_total / 1024:.1f} KB"
+        elif bytes_total < 1024 * 1024 * 1024:
+            return f"{bytes_total / (1024 * 1024):.1f} MB"
+        else:
+            return f"{bytes_total / (1024 * 1024 * 1024):.1f} GB"
+
+    def _show_connection_details(self, connection_name: str):
+        """Show detailed statistics for a connection."""
+        if self.stats_manager is None:
+            return
+
+        stats = self.stats_manager.get_stats(connection_name)
+        if stats is None:
+            QMessageBox.information(self, "Info", f"No statistics available for {connection_name}")
+            return
+
+        formatted = self.stats_manager.get_formatted_stats(connection_name)
+
+        details = f"""
+        <h2>{connection_name} Statistics</h2>
+        <table>
+            <tr><td><b>Session Time:</b></td><td>{formatted.get('session_time', '0s')}</td></tr>
+            <tr><td><b>Total Time:</b></td><td>{formatted.get('total_time', '0s')}</td></tr>
+            <tr><td><b>Send Speed:</b></td><td>{formatted.get('send_speed', '0 B/s')}</td></tr>
+            <tr><td><b>Receive Speed:</b></td><td>{formatted.get('recv_speed', '0 B/s')}</td></tr>
+            <tr><td><b>Total Sent:</b></td><td>{formatted.get('total_sent', '0 B')}</td></tr>
+            <tr><td><b>Total Received:</b></td><td>{formatted.get('total_recv', '0 B')}</td></tr>
+            <tr><td><b>Peak Send:</b></td><td>{formatted.get('peak_send', '0 B/s')}</td></tr>
+            <tr><td><b>Peak Receive:</b></td><td>{formatted.get('peak_recv', '0 B/s')}</td></tr>
+            <tr><td><b>Packets Sent:</b></td><td>{formatted.get('packets_sent', '0')}</td></tr>
+            <tr><td><b>Packets Received:</b></td><td>{formatted.get('packets_recv', '0')}</td></tr>
+            <tr><td><b>Errors:</b></td><td>{formatted.get('errors', '0')}</td></tr>
+            <tr><td><b>Drops:</b></td><td>{formatted.get('drops', '0')}</td></tr>
+        </table>
+        """
+
+        QMessageBox.about(self, f"{connection_name} Details", details)
+
+    def _reset_connection_stats(self, connection_name: str):
+        """Reset statistics for a connection."""
+        if self.stats_manager is None:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Reset Statistics",
+            f"Are you sure you want to reset statistics for {connection_name}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.stats_manager.reset_stats(connection_name)
+            self._update_stats_display()
+
+    # Theme management methods
+    def _set_light_theme(self):
+        """Set the theme to light."""
+        if self.theme_manager is not None:
+            self.theme_manager.set_user_preference(self.theme_manager.ThemeType.LIGHT)
+            self.theme_manager.apply_theme(self.app)
+
+    def _set_dark_theme(self):
+        """Set the theme to dark."""
+        if self.theme_manager is not None:
+            self.theme_manager.set_user_preference(self.theme_manager.ThemeType.DARK)
+            self.theme_manager.apply_theme(self.app)
+
+    def _set_system_theme(self):
+        """Set the theme to follow system."""
+        if self.theme_manager is not None:
+            self.theme_manager.set_user_preference(self.theme_manager.ThemeType.SYSTEM)
+            self.theme_manager.apply_theme(self.app)
+
+    def _toggle_theme(self):
+        """Toggle between light and dark theme."""
+        if self.theme_manager is not None:
+            new_theme = self.theme_manager.toggle_theme()
+            self.theme_manager.apply_theme(self.app)
 
     def add_connection(self):
         """Add a new VPN connection."""
@@ -455,11 +737,16 @@ class MainWindow(QMainWindow):
 
     def show_about(self):
         """Show the about dialog."""
-        about_text = """
+        de_name = "Unknown"
+        if self.theme_manager is not None and hasattr(self.theme_manager, 'de_manager'):
+            de_name = self.theme_manager.de_manager.get_name()
+
+        about_text = f"""
         <h2>VPN Manager</h2>
         <p>A cross-distribution, cross-desktop environment GUI application for managing
         VPN connections (OpenVPN, WireGuard) on Linux.</p>
         <p><b>Version:</b> 1.0.0</p>
+        <p><b>Desktop Environment:</b> {de_name}</p>
         <p><b>License:</b> MIT</p>
         <p><b>Author:</b> LinuxVPNManager Team</p>
         """
@@ -471,6 +758,10 @@ class MainWindow(QMainWindow):
             # Stop all active VPN connections
             for connection_name in list(self.vpn_handler.active_processes.keys()):
                 self.vpn_handler.stop_vpn(connection_name)
+
+            # Stop stats timer
+            if hasattr(self, 'stats_timer') and self.stats_timer.isActive():
+                self.stats_timer.stop()
 
             self.logger.info("Window closed, all connections stopped")
             event.accept()

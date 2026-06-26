@@ -15,7 +15,7 @@ import logging
 class SystemTrayIcon(QSystemTrayIcon):
     """System tray icon for VPN Manager."""
 
-    def __init__(self, vpn_handler, config_manager, log_manager, main_window):
+    def __init__(self, vpn_handler, config_manager, log_manager, main_window, theme_manager=None, notification_manager=None):
         """
         Initialize the system tray icon.
 
@@ -24,6 +24,8 @@ class SystemTrayIcon(QSystemTrayIcon):
             config_manager: ConfigManager instance
             log_manager: LogManager instance
             main_window: MainWindow instance
+            theme_manager: ThemeManager instance (optional)
+            notification_manager: NotificationManager instance (optional)
         """
         # Try to find icon
         icon_path = self._get_icon_path("icon.png")
@@ -38,6 +40,8 @@ class SystemTrayIcon(QSystemTrayIcon):
         self.config_manager = config_manager
         self.log_manager = log_manager
         self.main_window = main_window
+        self.theme_manager = theme_manager
+        self.notification_manager = notification_manager
         self.logger = logging.getLogger("SystemTrayIcon")
 
         # Create menu
@@ -98,6 +102,12 @@ class SystemTrayIcon(QSystemTrayIcon):
         ).expanduser()
         if user_icon_path.exists():
             return str(user_icon_path)
+
+        # Try using DE manager if available
+        if self.theme_manager is not None and hasattr(self.theme_manager, 'de_manager'):
+            de_icon = self.theme_manager.de_manager.get_icon_path(filename.replace(".png", ""))
+            if de_icon:
+                return de_icon
 
         return None
 
@@ -221,8 +231,15 @@ class SystemTrayIcon(QSystemTrayIcon):
 
             if success:
                 self.refresh_status()
+                if self.notification_manager is not None:
+                    if status == "UP":
+                        self.notification_manager.show_connection_disconnected(name)
+                    else:
+                        self.notification_manager.show_connection_connected(name)
                 self.showMessage("VPN Manager", message)
             else:
+                if self.notification_manager is not None:
+                    self.notification_manager.show_connection_error(name, message)
                 self.showMessage("VPN Manager", f"Error: {message}", QIcon(), 5000)
 
         except Exception as e:
@@ -240,4 +257,7 @@ class SystemTrayIcon(QSystemTrayIcon):
             message: Notification message
             duration: Duration in milliseconds
         """
-        self.showMessage(title, message, QIcon(), duration)
+        if self.notification_manager is not None:
+            self.notification_manager.send_notification(title, message)
+        else:
+            self.showMessage(title, message, QIcon(), duration)

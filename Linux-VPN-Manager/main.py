@@ -17,9 +17,13 @@ from PyQt6.QtGui import QIcon
 
 from frontend.main_window import MainWindow
 from frontend.tray_icon import SystemTrayIcon
+from frontend.theme_manager import get_theme_manager
 from backend.vpn_handler import VPNHandler
 from backend.log_manager import LogManager
 from backend.config_manager import ConfigManager
+from backend.stats_manager import get_stats_manager
+from backend.notification_manager import get_notification_manager
+from backend.de_manager import get_de_manager
 
 
 class VPNManager:
@@ -36,20 +40,38 @@ class VPNManager:
         self.app.setApplicationName("VPN Manager")
         self.app.setOrganizationName("LinuxVPNManager")
 
-        # Initialize backend
+        # Initialize managers
         self.config_manager = ConfigManager()
         self.log_manager = LogManager()
-        self.vpn_handler = VPNHandler(self.config_manager, self.log_manager)
+        self.stats_manager = get_stats_manager()
+        self.vpn_handler = VPNHandler(
+            self.config_manager, self.log_manager, self.stats_manager
+        )
+
+        # Initialize DE-specific managers
+        self.de_manager = get_de_manager()
+        self.notification_manager = get_notification_manager()
+
+        # Initialize theme manager and apply theme
+        self.theme_manager = get_theme_manager(self.app)
+        self.theme_manager.apply_theme(self.app)
 
         # Initialize frontend
         self.main_window = MainWindow(
-            self.vpn_handler, self.config_manager, self.log_manager
+            self.vpn_handler,
+            self.config_manager,
+            self.log_manager,
+            self.stats_manager,
+            self.theme_manager,
+            self.notification_manager,
         )
         self.tray_icon = SystemTrayIcon(
             self.vpn_handler,
             self.config_manager,
             self.log_manager,
             self.main_window,
+            self.theme_manager,
+            self.notification_manager,
         )
 
         # Set app icon
@@ -74,7 +96,7 @@ class VPNManager:
         )
         self.logger = logging.getLogger("VPNManager")
 
-    def _get_icon_path(self, filename):
+    def _get_icon_path(self, filename: str) -> Optional[str]:
         """Get the path to an icon file."""
         # Check in assets directory relative to script
         script_dir = Path(__file__).parent
@@ -96,6 +118,11 @@ class VPNManager:
         if user_icon_path.exists():
             return user_icon_path
 
+        # Try to find using DE manager
+        de_icon = self.de_manager.get_icon_path(filename.replace(".png", ""))
+        if de_icon:
+            return Path(de_icon)
+
         return None
 
     def _setup_signal_handlers(self):
@@ -115,6 +142,9 @@ class VPNManager:
         # Stop all active VPN connections
         for connection_name in list(self.vpn_handler.active_processes.keys()):
             self.vpn_handler.stop_vpn(connection_name)
+        
+        # Stop stats monitoring
+        self.stats_manager.stop_all_monitoring()
 
     def run(self):
         """Run the application."""

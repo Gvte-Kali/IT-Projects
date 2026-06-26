@@ -16,16 +16,18 @@ import logging
 class VPNHandler:
     """Handles VPN connection operations."""
 
-    def __init__(self, config_manager, log_manager):
+    def __init__(self, config_manager, log_manager, stats_manager=None):
         """
         Initialize VPN Handler.
 
         Args:
             config_manager: ConfigManager instance for managing configurations
             log_manager: LogManager instance for managing logs
+            stats_manager: StatsManager instance for managing statistics (optional)
         """
         self.config_manager = config_manager
         self.log_manager = log_manager
+        self.stats_manager = stats_manager
         self.active_processes: Dict[str, subprocess.Popen] = {}
         self.logger = logging.getLogger("VPNHandler")
 
@@ -77,6 +79,11 @@ class VPNHandler:
 
             self.active_processes[connection_name] = process
             self.log_manager.start_logging(connection_name, process.stdout)
+
+            # Start stats monitoring if stats_manager is available
+            if self.stats_manager is not None:
+                interface = self._get_interface_for_connection(config_path, vpn_type)
+                self.stats_manager.start_monitoring(connection_name, interface)
 
             self.logger.info(f"Successfully started {vpn_type} VPN: {connection_name}")
             return True, f"Starting {vpn_type} VPN: {connection_name}"
@@ -133,6 +140,10 @@ class VPNHandler:
             # Clean up
             del self.active_processes[connection_name]
             self.log_manager.stop_logging(connection_name)
+
+            # Stop stats monitoring if stats_manager is available
+            if self.stats_manager is not None:
+                self.stats_manager.stop_monitoring(connection_name)
 
             self.logger.info(f"Successfully stopped {vpn_type} VPN: {connection_name}")
             return True, f"Stopped VPN: {connection_name}"
@@ -387,3 +398,21 @@ class VPNHandler:
         except Exception:
             pass
         return "tun0"
+
+    def _get_interface_for_connection(self, config_path: str, vpn_type: str) -> str:
+        """
+        Get the network interface for a connection.
+
+        Args:
+            config_path: Path to the configuration file
+            vpn_type: Type of VPN (openvpn, wireguard)
+
+        Returns:
+            str: Network interface name
+        """
+        if vpn_type == "openvpn":
+            return self._get_openvpn_interface(config_path)
+        elif vpn_type == "wireguard":
+            return Path(config_path).stem
+        else:
+            return "tun0"
