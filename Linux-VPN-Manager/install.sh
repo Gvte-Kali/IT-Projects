@@ -246,31 +246,75 @@ create_systemd_service() {
     print_step "Creating systemd service (optional)..."
     
     local service_file="/etc/systemd/system/vpn-manager.service"
+    local install_dir="/opt/vpn-manager"
     
-    cat > /tmp/vpn-manager.service <<EOF
+    # Check if we should install systemd service
+    read -p "Install systemd service for automatic startup? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Skipping systemd service installation"
+        return
+    fi
+    
+    # Check if running as root for systemd installation
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${YELLOW}Warning: systemd service installation requires root privileges${NC}"
+        echo "Please run this script with sudo or install the service manually"
+        return
+    fi
+    
+    # Create installation directory
+    mkdir -p "$install_dir"
+    
+    # Copy application files to installation directory
+    cp -r "$SCRIPT_DIR"/{main.py,backend,frontend,assets,requirements.txt} "$install_dir/"
+    
+    # Copy the systemd service file
+    if [ -f "$SCRIPT_DIR/vpn-manager.service" ]; then
+        cp "$SCRIPT_DIR/vpn-manager.service" "$service_file"
+    else
+        # Fallback: create service file
+        cat > "$service_file" <<EOF
 [Unit]
-Description=VPN Manager
-After=network.target
+Description=Linux VPN Manager
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=$SCRIPT_DIR/main.py
+ExecStart=/usr/bin/python3 $install_dir/main.py
+WorkingDirectory=$install_dir
 Restart=on-failure
 RestartSec=5s
-User=$USER
 Environment=DISPLAY=:0
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
+Environment=XDG_RUNTIME_DIR=/run/user/%i
+
+# For systems with polkit or policykit
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%i/bus
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=$install_dir /etc/vpn-manager /var/log/vpn-manager /run/user/%i
+
+# Allow access to network configuration
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_SYS_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
 
 [Install]
 WantedBy=multi-user.target
 EOF
+    fi
     
-    echo "Systemd service file created at /tmp/vpn-manager.service"
-    echo "To install it manually, run:"
-    echo "  sudo cp /tmp/vpn-manager.service /etc/systemd/system/"
-    echo "  sudo systemctl daemon-reload"
-    echo "  sudo systemctl enable vpn-manager.service"
-    echo "  sudo systemctl start vpn-manager.service"
+    # Reload systemd and enable service
+    systemctl daemon-reload
+    systemctl enable vpn-manager.service
+    
+    print_success "Systemd service installed and enabled"
+    echo "To start the service, run: sudo systemctl start vpn-manager.service"
+    echo "To check status, run: sudo systemctl status vpn-manager.service"
 }
 
 # Function to create uninstall script
@@ -301,6 +345,12 @@ if [ -f "/etc/systemd/system/vpn-manager.service" ]; then
     sudo rm -f "/etc/systemd/system/vpn-manager.service"
     sudo systemctl daemon-reload
     echo "Systemd service removed"
+fi
+
+# Remove installation directory
+if [ -d "/opt/vpn-manager" ]; then
+    sudo rm -rf "/opt/vpn-manager"
+    echo "Installation directory removed"
 fi
 
 # Remove user configuration

@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QComboBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer, QSettings
 from PyQt6.QtGui import QIcon, QAction, QFont
 from typing import Optional
 import logging
@@ -62,6 +62,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("VPN Manager")
         self.setGeometry(100, 100, 700, 550)
         self.setMinimumSize(600, 500)
+
+        # Restore saved window geometry and state
+        self.settings = QSettings("LinuxVPNManager", "VPNManager")
+        saved_geometry = self.settings.value("window_geometry", None)
+        saved_state = self.settings.value("window_state", None)
+        if saved_geometry:
+            self.restoreGeometry(saved_geometry)
+        if saved_state:
+            self.restoreState(saved_state)
 
         # Create signal emitter for cross-widget communication
         self.signal_emitter = SignalEmitter()
@@ -266,6 +275,13 @@ class MainWindow(QMainWindow):
         about_action = QAction("About", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
+
+        # Test notification action (if notification_manager is available)
+        if self.notification_manager is not None:
+            help_menu.addSeparator()
+            test_notification_action = QAction("Test Notification", self)
+            test_notification_action.triggered.connect(self._test_notification)
+            help_menu.addAction(test_notification_action)
 
     def _connect_signals(self):
         """Connect signals between components."""
@@ -754,9 +770,26 @@ class MainWindow(QMainWindow):
         """
         QMessageBox.about(self, "About VPN Manager", about_text)
 
+    def _test_notification(self):
+        """Test the notification system."""
+        if self.notification_manager is not None:
+            self.notification_manager.send_notification(
+                title="VPN Manager Test",
+                message="This is a test notification to verify that notifications are working correctly.",
+                icon="dialog-info",
+                urgency=self.notification_manager.URGENCY_NORMAL,
+                timeout=5000,
+            )
+
     def closeEvent(self, event):
         """Handle window close event."""
         try:
+            # Save window geometry and state
+            self.settings = QSettings("LinuxVPNManager", "VPNManager")
+            self.settings.setValue("window_geometry", self.saveGeometry())
+            self.settings.setValue("window_state", self.saveState())
+            self.settings.sync()
+
             # Stop all active VPN connections
             for connection_name in list(self.vpn_handler.active_processes.keys()):
                 self.vpn_handler.stop_vpn(connection_name)

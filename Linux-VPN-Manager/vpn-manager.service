@@ -1,0 +1,30 @@
+[Unit]
+Description=Linux VPN Manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/vpn-manager/main.py
+WorkingDirectory=/opt/vpn-manager
+Restart=on-failure
+RestartSec=5s
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/%i
+
+# For systems with polkit or policykit
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%i/bus
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/vpn-manager /etc/vpn-manager /var/log/vpn-manager /run/user/%i
+
+# Allow access to network configuration
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_SYS_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target
