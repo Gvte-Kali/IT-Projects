@@ -1,0 +1,48 @@
+# =============================================================================
+# SecurepathVPN — Configuration File
+# Edit this file to customize your SecurepathVPN deployment.
+# =============================================================================
+
+# --- PiVPN Configuration ---
+# User who will manage PiVPN (default: pi)
+PIVPN_USER="pi"
+
+# OpenVPN protocol: udp or tcp
+PIVPN_PROTO="udp"
+
+# OpenVPN port (default: 1194)
+PIVPN_PORT="1194"
+
+# DNS server for VPN clients (e.g., 1.1.1.1, 8.8.8.8)
+PIVPN_DNS="1.1.1.1"
+
+# VPN subnet (e.g., 10.8.0.0/24)
+PIVPN_NET="10.8.0.0/24"
+
+# Network interface for LAN (e.g., eth0, wlan0)
+LAN_INTERFACE="eth0"
+
+# --- First VPN Client ---
+# Name of the first VPN client to create
+VPN_CLIENT_NAME="client1"
+
+# Password for the first VPN client (leave empty for random 32-character password)
+VPN_CLIENT_PASS=""
+
+# --- Tailscale Configuration ---
+# Tailscale auth key (generate at https://login.tailscale.com/admin/settings/keys)
+# Leave empty for manual login
+TAILSCALE_AUTHKEY=""
+
+# --- Discord Notifications ---
+# Discord webhook URL for notifications (e.g., https://discord.com/api/webhooks/...)
+DISCORD_WEBHOOK="YOUR_DISCORD_WEBHOOK_URL"
+
+# --- Directories ---
+# Directory for OpenVPN client configuration files
+OVPNS_DIR="/home/$PIVPN_USER/ovpns"
+
+# --- Optional: Uncomment to override ---
+# Uncomment and edit the following lines if you need to customize further
+# PIVPN_DEV="tun0"  # VPN interface (default: tun0)
+# PIVPN_NAT="y"     # Enable NAT (default: y)

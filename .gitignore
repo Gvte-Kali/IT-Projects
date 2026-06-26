@@ -1,0 +1,54 @@
+# =============================================================================
+# SecurepathVPN — .gitignore
+# =============================================================================
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# Environment and local configuration
+.env
+.env.local
+config.local.txt
+
+# OpenVPN client configurations (contains sensitive data)
+ovpns/
+*.ovpn
+
+# Backup files
+*.tar.gz
+*.bak
+*.backup
+
+# Temporary files
+/tmp/*
+*.tmp
+
+# SSH keys
+host_*
+id_*
+
+# Tailscale
+/tailscale*
+
+# PiVPN
+/pivpn*
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# System
+core
+*.core
+
+# Build and dependency directories
+vendor/
+node_modules/
