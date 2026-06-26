@@ -26,25 +26,19 @@ Ensure the following dependencies are installed on your system:
 ```bash
 # Debian/Ubuntu
 sudo apt install python3-pyqt6 openvpn wireguard-tools
-
+```
+```bash
 # Fedora/RHEL
 sudo dnf install python3-qt6 openvpn wireguard-tools
-
+```
+```bash
 # Arch Linux
 sudo pacman -S python-pyqt6 openvpn wireguard-tools
 ```
 ## Install Python Dependencies
 ```bash
-pip install -r requirements.txt
+pip install -r https://raw.githubusercontent.com/Gvte-Kali/IT-Projects/refs/heads/main/Linux-VPN-Manager/requirements.txt
 ```
-
-
-```bash
-git clone https://github.com/yourusername/vpn-manager.git
-cd vpn-manager
-python main.py
-```
-
 
 ## Usage
 
