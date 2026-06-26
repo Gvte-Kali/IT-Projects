@@ -16,8 +16,6 @@ from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QPalette, QColor, QFont
 from PyQt6.QtWidgets import QApplication
 
-from backend.de_manager import get_de_manager
-
 
 class ThemeType(Enum):
     """Theme types supported by the application."""

@@ -283,6 +283,7 @@ class StatsManager:
         """Update stats using ip command (fallback when psutil is not available)."""
         try:
             import subprocess
+            import re
             
             # Get bytes sent and received
             result = subprocess.run(
@@ -294,11 +295,69 @@ class StatsManager:
             
             if result.returncode == 0:
                 # Parse the output to get bytes
+                # Example output:
+                # 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+                #     link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff
+                #     RX: bytes  packets  errors  dropped  overrun  mcast
+                #     1234567    1234     0       0        0       0
+                #     TX: bytes  packets  errors  dropped  carrier  collsns
+                #     7654321    5678     0       0        0       0
+                
                 lines = result.stdout.splitlines()
-                for line in lines:
-                    if "RX:" in line or "bytes" in line:
-                        # This is a simplified parser - actual implementation would need to parse properly
-                        pass
+                rx_bytes = 0
+                tx_bytes = 0
+                rx_packets = 0
+                tx_packets = 0
+                errors = 0
+                drops = 0
+                
+                for i, line in enumerate(lines):
+                    if "RX:" in line and i + 1 < len(lines):
+                        # Next line has the RX stats
+                        rx_line = lines[i + 1].strip()
+                        rx_parts = rx_line.split()
+                        if len(rx_parts) >= 2:
+                            try:
+                                rx_bytes = int(rx_parts[0])
+                                rx_packets = int(rx_parts[1])
+                            except (ValueError, IndexError):
+                                pass
+                        if len(rx_parts) >= 4:
+                            try:
+                                errors += int(rx_parts[2])
+                                drops += int(rx_parts[3])
+                            except (ValueError, IndexError):
+                                pass
+                    
+                    elif "TX:" in line and i + 1 < len(lines):
+                        # Next line has the TX stats
+                        tx_line = lines[i + 1].strip()
+                        tx_parts = tx_line.split()
+                        if len(tx_parts) >= 2:
+                            try:
+                                tx_bytes = int(tx_parts[0])
+                                tx_packets = int(tx_parts[1])
+                            except (ValueError, IndexError):
+                                pass
+                        if len(tx_parts) >= 4:
+                            try:
+                                errors += int(tx_parts[2])
+                                drops += int(tx_parts[3])
+                            except (ValueError, IndexError):
+                                pass
+                
+                # Update stats
+                with self._lock:
+                    if connection_name in self._stats:
+                        stats = self._stats[connection_name]
+                        stats.update_rates(
+                            tx_bytes,
+                            rx_bytes,
+                            tx_packets,
+                            rx_packets
+                        )
+                        stats.errors = errors
+                        stats.drops = drops
 
         except Exception as e:
             self.logger.debug(f"Error updating stats with ip command: {str(e)}")

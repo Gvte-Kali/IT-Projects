@@ -4,6 +4,8 @@ Main Window Module
 Provides the main GUI window for VPN Manager application.
 """
 
+from pathlib import Path
+
 from PyQt6.QtWidgets import (
     QMainWindow,
     QVBoxLayout,
