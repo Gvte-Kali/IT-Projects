@@ -11,10 +11,23 @@ import logging
 
 try:
     import matplotlib
-    matplotlib.use("Qt5Agg")  # Use Qt5 backend for compatibility
+    # Try Qt6 first, then Qt5
+    try:
+        matplotlib.use("Qt6Agg")
+    except:
+        try:
+            matplotlib.use("Qt5Agg")
+        except:
+            matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.figure import Figure
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    try:
+        from matplotlib.backends.backend_qt6agg import FigureCanvasQTAgg as FigureCanvas
+    except ImportError:
+        try:
+            from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+        except ImportError:
+            FigureCanvas = None
     import numpy as np
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
@@ -397,15 +410,14 @@ class StatsChart:
         Returns:
             FigureCanvas widget or None if matplotlib is not available
         """
-        if not self._available:
+        if not self._available or FigureCanvas is None:
             return None
         
         try:
             canvas = FigureCanvas(figure)
-            canvas.setSizePolicy(
-                getattr(canvas, "SizePolicy Expanding", None),
-                getattr(canvas, "SizePolicy Expanding", None)
-            )
+            # Set size policy to expand
+            from PyQt6.QtWidgets import QSizePolicy
+            canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             return canvas
         except Exception as e:
             self.logger.error(f"Error creating chart widget: {str(e)}")

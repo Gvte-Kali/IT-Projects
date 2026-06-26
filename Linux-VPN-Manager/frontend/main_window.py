@@ -23,10 +23,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QTextEdit,
+    QSplitter,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer, QSettings
 from PyQt6.QtGui import QIcon, QAction, QFont
-from typing import Optional
+from typing import Optional, List
 import logging
 
 
@@ -128,6 +129,12 @@ class MainWindow(QMainWindow):
             self.stats_tab = QWidget()
             self._init_stats_tab()
             self.tab_widget.addTab(self.stats_tab, "Statistics")
+        
+        # Create charts tab if stats_chart is available
+        if self.stats_chart is not None and self.stats_chart.is_available:
+            self.charts_tab = QWidget()
+            self._init_charts_tab()
+            self.tab_widget.addTab(self.charts_tab, "Charts")
         
         # Create history tab if history_manager is available
         if self.history_manager is not None:
@@ -255,6 +262,293 @@ class MainWindow(QMainWindow):
 
         # Update stats display
         self._update_stats_display()
+
+    def _init_charts_tab(self):
+        """Initialize the charts tab with matplotlib integration."""
+        try:
+            if self.stats_chart is None or not self.stats_chart.is_available:
+                return
+            
+            # Main layout for charts tab
+            charts_layout = QVBoxLayout(self.charts_tab)
+            charts_layout.setContentsMargins(10, 10, 10, 10)
+            charts_layout.setSpacing(10)
+            
+            # Create a splitter for resizable chart panels
+            splitter = QSplitter(Qt.Vertical)
+            charts_layout.addWidget(splitter)
+            
+            # Create chart containers
+            self.bandwidth_chart_container = QWidget()
+            self.duration_chart_container = QWidget()
+            self.success_rate_chart_container = QWidget()
+            
+            # Add containers to splitter
+            splitter.addWidget(self.bandwidth_chart_container)
+            splitter.addWidget(self.duration_chart_container)
+            splitter.addWidget(self.success_rate_chart_container)
+            
+            # Set stretch factors
+            splitter.setStretchFactor(0, 1)
+            splitter.setStretchFactor(1, 1)
+            splitter.setStretchFactor(2, 1)
+            
+            # Initialize chart layouts
+            self._init_bandwidth_chart()
+            self._init_duration_chart()
+            self._init_success_rate_chart()
+            
+            # Add refresh button
+            refresh_layout = QHBoxLayout()
+            refresh_button = QPushButton("Refresh Charts")
+            refresh_button.clicked.connect(self._refresh_charts)
+            refresh_layout.addWidget(refresh_button)
+            
+            # Add export button
+            export_button = QPushButton("Export Charts to PNG")
+            export_button.clicked.connect(self._export_charts)
+            refresh_layout.addWidget(export_button)
+            
+            charts_layout.addLayout(refresh_layout)
+            
+            # Update charts
+            self._update_charts()
+            
+            # Set up timer for auto-refresh
+            self.charts_timer = QTimer()
+            self.charts_timer.timeout.connect(self._update_charts)
+            self.charts_timer.start(30000)  # Refresh every 30 seconds
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing charts tab: {str(e)}")
+
+    def _init_bandwidth_chart(self):
+        """Initialize the bandwidth chart."""
+        try:
+            layout = QVBoxLayout(self.bandwidth_chart_container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Title
+            title = QLabel("Bandwidth Usage (MB)")
+            title.setStyleSheet("font-weight: bold; font-size: 14px;")
+            layout.addWidget(title)
+            
+            # Chart widget placeholder
+            self.bandwidth_chart_widget = None
+            self.bandwidth_chart_figure = None
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing bandwidth chart: {str(e)}")
+
+    def _init_duration_chart(self):
+        """Initialize the duration chart."""
+        try:
+            layout = QVBoxLayout(self.duration_chart_container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Title
+            title = QLabel("Connection Durations (minutes)")
+            title.setStyleSheet("font-weight: bold; font-size: 14px;")
+            layout.addWidget(title)
+            
+            # Chart widget placeholder
+            self.duration_chart_widget = None
+            self.duration_chart_figure = None
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing duration chart: {str(e)}")
+
+    def _init_success_rate_chart(self):
+        """Initialize the success rate chart."""
+        try:
+            layout = QVBoxLayout(self.success_rate_chart_container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Title
+            title = QLabel("Connection Success Rates (%)")
+            title.setStyleSheet("font-weight: bold; font-size: 14px;")
+            layout.addWidget(title)
+            
+            # Chart widget placeholder
+            self.success_rate_chart_widget = None
+            self.success_rate_chart_figure = None
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing success rate chart: {str(e)}")
+
+    def _update_charts(self):
+        """Update all charts with current data."""
+        try:
+            if self.stats_chart is None or not self.stats_chart.is_available:
+                return
+            
+            # Get data from history manager
+            if self.history_manager is not None:
+                chart_data = self.stats_chart.get_chart_data_from_history(self.history_manager)
+            else:
+                chart_data = {"bandwidth": {}, "duration": {}, "statistics": {}}
+            
+            # Update bandwidth chart
+            self._update_bandwidth_chart(chart_data["bandwidth"])
+            
+            # Update duration chart
+            self._update_duration_chart(chart_data["duration"])
+            
+            # Update success rate chart
+            self._update_success_rate_chart(chart_data["statistics"])
+            
+        except Exception as e:
+            self.logger.error(f"Error updating charts: {str(e)}")
+
+    def _update_bandwidth_chart(self, data: dict):
+        """Update the bandwidth chart."""
+        try:
+            if self.stats_chart is None or not self.stats_chart.is_available:
+                return
+            
+            # Clear previous widget
+            if self.bandwidth_chart_widget is not None:
+                self.bandwidth_chart_widget.deleteLater()
+                self.bandwidth_chart_widget = None
+            
+            # Create new chart
+            fig = self.stats_chart.create_bandwidth_chart(data, show=False)
+            if fig is None:
+                return
+            
+            self.bandwidth_chart_figure = fig
+            widget = self.stats_chart.create_chart_widget(fig)
+            
+            if widget is not None:
+                # Add widget to layout
+                layout = self.bandwidth_chart_container.layout()
+                if layout is not None:
+                    # Remove any existing chart widget
+                    for i in reversed(range(layout.count())):
+                        item = layout.itemAt(i)
+                        if item and item.widget() and item.widget() != layout.itemAt(0).widget():
+                            widget_to_remove = item.widget()
+                            layout.removeWidget(widget_to_remove)
+                            widget_to_remove.deleteLater()
+                    layout.addWidget(widget)
+                self.bandwidth_chart_widget = widget
+            
+        except Exception as e:
+            self.logger.error(f"Error updating bandwidth chart: {str(e)}")
+
+    def _update_duration_chart(self, data: dict):
+        """Update the duration chart."""
+        try:
+            if self.stats_chart is None or not self.stats_chart.is_available:
+                return
+            
+            # Clear previous widget
+            if self.duration_chart_widget is not None:
+                self.duration_chart_widget.deleteLater()
+                self.duration_chart_widget = None
+            
+            # Create new chart
+            fig = self.stats_chart.create_duration_chart(data, show=False)
+            if fig is None:
+                return
+            
+            self.duration_chart_figure = fig
+            widget = self.stats_chart.create_chart_widget(fig)
+            
+            if widget is not None:
+                layout = self.duration_chart_container.layout()
+                if layout is not None:
+                    for i in reversed(range(layout.count())):
+                        item = layout.itemAt(i)
+                        if item and item.widget() and item.widget() != layout.itemAt(0).widget():
+                            widget_to_remove = item.widget()
+                            layout.removeWidget(widget_to_remove)
+                            widget_to_remove.deleteLater()
+                    layout.addWidget(widget)
+                self.duration_chart_widget = widget
+            
+        except Exception as e:
+            self.logger.error(f"Error updating duration chart: {str(e)}")
+
+    def _update_success_rate_chart(self, data: dict):
+        """Update the success rate chart."""
+        try:
+            if self.stats_chart is None or not self.stats_chart.is_available:
+                return
+            
+            # Clear previous widget
+            if self.success_rate_chart_widget is not None:
+                self.success_rate_chart_widget.deleteLater()
+                self.success_rate_chart_widget = None
+            
+            # Create new chart
+            fig = self.stats_chart.create_success_rate_chart(data, show=False)
+            if fig is None:
+                return
+            
+            self.success_rate_chart_figure = fig
+            widget = self.stats_chart.create_chart_widget(fig)
+            
+            if widget is not None:
+                layout = self.success_rate_chart_container.layout()
+                if layout is not None:
+                    for i in reversed(range(layout.count())):
+                        item = layout.itemAt(i)
+                        if item and item.widget() and item.widget() != layout.itemAt(0).widget():
+                            widget_to_remove = item.widget()
+                            layout.removeWidget(widget_to_remove)
+                            widget_to_remove.deleteLater()
+                    layout.addWidget(widget)
+                self.success_rate_chart_widget = widget
+            
+        except Exception as e:
+            self.logger.error(f"Error updating success rate chart: {str(e)}")
+
+    def _refresh_charts(self):
+        """Manually refresh all charts."""
+        self._update_charts()
+
+    def _export_charts(self):
+        """Export charts to PNG files."""
+        try:
+            if self.stats_chart is None or not self.stats_chart.is_available:
+                QMessageBox.warning(self, "Export Error", "Matplotlib is not available")
+                return
+            
+            # Get data
+            if self.history_manager is not None:
+                chart_data = self.stats_chart.get_chart_data_from_history(self.history_manager)
+            else:
+                chart_data = {"bandwidth": {}, "duration": {}, "statistics": {}}
+            
+            # Export each chart
+            import os
+            from datetime import datetime
+            
+            # Create export directory
+            export_dir = os.path.expanduser(f"~/.local/share/vpn-manager/charts/{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            os.makedirs(export_dir, exist_ok=True)
+            
+            # Export bandwidth chart
+            if self.bandwidth_chart_figure:
+                bandwidth_path = os.path.join(export_dir, "bandwidth.png")
+                self.bandwidth_chart_figure.savefig(bandwidth_path, dpi=300, bbox_inches="tight")
+            
+            # Export duration chart
+            if self.duration_chart_figure:
+                duration_path = os.path.join(export_dir, "duration.png")
+                self.duration_chart_figure.savefig(duration_path, dpi=300, bbox_inches="tight")
+            
+            # Export success rate chart
+            if self.success_rate_chart_figure:
+                success_path = os.path.join(export_dir, "success_rate.png")
+                self.success_rate_chart_figure.savefig(success_path, dpi=300, bbox_inches="tight")
+            
+            QMessageBox.information(self, "Export Successful", f"Charts exported to:\n{export_dir}")
+            
+        except Exception as e:
+            self.logger.error(f"Error exporting charts: {str(e)}")
+            QMessageBox.critical(self, "Export Error", f"Failed to export charts: {str(e)}")
 
     def _create_menu_bar(self):
         """Create the menu bar."""
