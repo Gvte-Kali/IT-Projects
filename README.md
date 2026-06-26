@@ -1,0 +1,1 @@
+Some projects for IT that can be useful to me, and maybe to you
