@@ -1,4 +1,3 @@
-# WORK IN PROGRESS !!
 # 🔧 IT-Projects
 **A collection of IT and cybersecurity projects for automation, networking, and pentesting.**
 
@@ -11,11 +10,7 @@
 ---
 
 ## 📌 **About**
-This repository contains **open-source IT projects** focused on:
-- **Networking & VPN** (OpenVPN, WireGuard, Tailscale)
-- **Automation & Scripting** (Bash, Python)
-- **Cybersecurity Tools** (Pentesting, Security Hardening)
-- **Cross-Platform Solutions** (Linux, Docker, Raspberry Pi)
+This repository contains my **personnal & open-source IT projects**.
 
 Each project is designed to be **modular, efficient, and production-ready**.
 
@@ -26,7 +21,11 @@ Each project is designed to be **modular, efficient, and production-ready**.
 ## 🚀 **Projects**
    **Project**          | **Description**                                                                                     | **Language**       | **Status**          |
  |----------------------|-----------------------------------------------------------------------------------------------------|--------------------|---------------------|
- | **[Linux-VPN-Manager](Linux-VPN-Manager)** | A **cross-DE GUI** for managing OpenVPN/WireGuard connections with system tray integration.       | Python (PyQt6)     | ✅ Active           |
- | **[SecurepathVPN](https://github.com/Gvte-Kali/SecurepathVPN)**       | Automated **PiVPN deployment** with Tailscale fallback, VNC, and Discord notifications.               | Shell, Python      | ✅ Active           |
+  | **[AirGappedCVEs](https://github.com/Gvte-Kali/AirGappedCVE)**       | Asset & Vulnerability Manager for Air-Gapped Environments               | Shell, Python, HTML      | ✅ Active           |
+ | **[[Linux-VPN-Manager](Linux-VPN-Manager)](https://github.com/Gvte-Kali/Linux-VPN-Manager)** | A **cross-DE GUI** for managing OpenVPN/WireGuard connections with system tray integration.       | Python (Tkinter)     | WORK IN PROGRESS           |
+ | **[SecurepathVPN](https://github.com/Gvte-Kali/SecurepathVPN)**       | Automated **PiVPN deployment** with Tailscale fallback, VNC, and Discord notifications.               | Shell, Python      | WORK IN PROGRESS           |
+
+
+ https://github.com/Gvte-Kali/AirGappedCVE
 
 ---
