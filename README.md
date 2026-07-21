@@ -27,6 +27,6 @@ Each project is designed to be **modular, efficient, and production-ready**.
    **Project**          | **Description**                                                                                     | **Language**       | **Status**          |
  |----------------------|-----------------------------------------------------------------------------------------------------|--------------------|---------------------|
  | **[Linux-VPN-Manager](Linux-VPN-Manager)** | A **cross-DE GUI** for managing OpenVPN/WireGuard connections with system tray integration.       | Python (PyQt6)     | ✅ Active           |
- | **[SecurepathVPN]([SecurepathVPN](https://github.com/Gvte-Kali/SecurepathVPN))**       | Automated **PiVPN deployment** with Tailscale fallback, VNC, and Discord notifications.               | Shell, Python      | ✅ Active           |
+ | **[SecurepathVPN](https://github.com/Gvte-Kali/SecurepathVPN)**       | Automated **PiVPN deployment** with Tailscale fallback, VNC, and Discord notifications.               | Shell, Python      | ✅ Active           |
 
 ---
