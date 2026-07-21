@@ -25,6 +25,5 @@ Each project is designed to be **modular, efficient, and production-ready**.
  | **[SecurepathVPN](https://github.com/Gvte-Kali/SecurepathVPN)**       | Automated **PiVPN deployment** with Tailscale fallback, VNC, and Discord notifications.               | Shell, Python      | WORK IN PROGRESS           |
 
 
- https://github.com/Gvte-Kali/AirGappedCVE
 
 ---
