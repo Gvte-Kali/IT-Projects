@@ -2,7 +2,7 @@
 
 # VPN Manager - Installation Script
 # =================================
-# This script installs VPN Manager with all required dependencies
+# Simple installation script for VPN Manager
 
 set -e
 
@@ -12,11 +12,6 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
-
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then
-    echo -e "${YELLOW}Warning: Running as root. Some operations may require user-specific setup.${NC}"
-fi
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -37,17 +32,12 @@ print_step() {
 
 # Function to print success
 print_success() {
-    echo -e "${GREEN}[✓] $1${NC}"
+    echo -e "${GREEN}[OK] $1${NC}"
 }
 
 # Function to print error
 print_error() {
-    echo -e "${RED}[✗] $1${NC}"
-}
-
-# Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+    echo -e "${RED}[ERROR] $1${NC}"
 }
 
 # Function to detect Linux distribution
@@ -55,7 +45,7 @@ detect_distro() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         echo "$ID"
-    elif command_exists lsb_release; then
+    elif command -v lsb_release >/dev/null 2>&1; then
         lsb_release -si | tr '[:upper:]' '[:lower:]'
     elif [ -f /etc/redhat-release ]; then
         echo "rhel"
@@ -77,31 +67,31 @@ install_system_deps() {
             sudo apt-get install -y \
                 python3 \
                 python3-pip \
-                python3-venv \
                 openvpn \
                 wireguard-tools \
-                resolvconf \
-                iproute2 \
-                sudo
+                sudo \
+                dnsutils  # for dig (DNS leak detection)
             ;;
         fedora|rhel|centos)
             print_step "Installing dependencies for Fedora/RHEL..."
-            if command_exists dnf; then
+            if command -v dnf >/dev/null 2>&1; then
                 sudo dnf install -y \
                     python3 \
                     python3-pip \
                     openvpn \
                     wireguard-tools \
                     which \
-                    sudo
-            elif command_exists yum; then
+                    sudo \
+                    bind-utils  # for dig
+            elif command -v yum >/dev/null 2>&1; then
                 sudo yum install -y \
                     python3 \
                     python3-pip \
                     openvpn \
                     wireguard-tools \
                     which \
-                    sudo
+                    sudo \
+                    bind-utils
             fi
             ;;
         arch|manjaro|endeavouros)
@@ -112,7 +102,8 @@ install_system_deps() {
                 openvpn \
                 wireguard-tools \
                 which \
-                sudo
+                sudo \
+                bind  # for dig
             ;;
         opensuse|suse)
             print_step "Installing dependencies for openSUSE..."
@@ -122,7 +113,8 @@ install_system_deps() {
                 openvpn \
                 wireguard-tools \
                 which \
-                sudo
+                sudo \
+                bind-utils
             ;;
         *)
             print_error "Unsupported Linux distribution: $distro"
@@ -132,7 +124,7 @@ install_system_deps() {
             echo "  - OpenVPN"
             echo "  - WireGuard tools (wg-quick, wg)"
             echo "  - sudo"
-            echo "  - iproute2 (ip command)"
+            echo "  - bind-utils or dnsutils (for dig command)"
             exit 1
             ;;
     esac
@@ -140,72 +132,12 @@ install_system_deps() {
     print_success "System dependencies installed"
 }
 
-# Function to create assets directory and icons
-create_assets() {
-    print_step "Creating assets..."
-    
-    # Create assets directory
-    mkdir -p "$SCRIPT_DIR/assets"
-    
-    # Create simple SVG icons if they don't exist
-    # Green circle icon (for connected)
-    if [ ! -f "$SCRIPT_DIR/assets/green.png" ]; then
-        # Create a simple green PNG using ImageMagick if available
-        if command_exists convert; then
-            convert -size 16x16 xc:none -fill green -draw "circle 8,8 8,1" "$SCRIPT_DIR/assets/green.png"
-        else
-            # Create a placeholder file
-            echo "Placeholder green icon" > "$SCRIPT_DIR/assets/green.png"
-        fi
-    fi
-    
-    # Red circle icon (for disconnected)
-    if [ ! -f "$SCRIPT_DIR/assets/red.png" ]; then
-        if command_exists convert; then
-            convert -size 16x16 xc:none -fill red -draw "circle 8,8 8,1" "$SCRIPT_DIR/assets/red.png"
-        else
-            echo "Placeholder red icon" > "$SCRIPT_DIR/assets/red.png"
-        fi
-    fi
-    
-    # Yellow circle icon (for connecting)
-    if [ ! -f "$SCRIPT_DIR/assets/yellow.png" ]; then
-        if command_exists convert; then
-            convert -size 16x16 xc:none -fill yellow -draw "circle 8,8 8,1" "$SCRIPT_DIR/assets/yellow.png"
-        else
-            echo "Placeholder yellow icon" > "$SCRIPT_DIR/assets/yellow.png"
-        fi
-    fi
-    
-    # Main icon
-    if [ ! -f "$SCRIPT_DIR/assets/icon.png" ]; then
-        if command_exists convert; then
-            # Create a simple VPN icon
-            convert -size 64x64 xc:none -fill blue -draw "rectangle 10,20 54,44" "$SCRIPT_DIR/assets/icon.png"
-        else
-            echo "Placeholder icon" > "$SCRIPT_DIR/assets/icon.png"
-        fi
-    fi
-    
-    print_success "Assets created"
-}
-
 # Function to install Python dependencies
 install_python_deps() {
     print_step "Installing Python dependencies..."
     
-    # Create virtual environment (optional)
-    if [ ! -d "$SCRIPT_DIR/.venv" ]; then
-        print_step "Creating Python virtual environment..."
-        python3 -m venv "$SCRIPT_DIR/.venv"
-    fi
-    
-    # Install Python packages
-    if [ -f "$SCRIPT_DIR/.venv/bin/pip" ]; then
-        "$SCRIPT_DIR/.venv/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
-    else
-        pip3 install -r "$SCRIPT_DIR/requirements.txt"
-    fi
+    # Install pystray and Pillow for system tray support
+    pip3 install --user pystray Pillow
     
     print_success "Python dependencies installed"
 }
@@ -222,99 +154,22 @@ Version=1.0
 Type=Application
 Name=VPN Manager
 GenericName=VPN Connection Manager
-Comment=A GUI application for managing VPN connections on Linux
-Exec=$SCRIPT_DIR/main.py
-Icon=$SCRIPT_DIR/assets/icon.png
+Comment=A simple GUI application for managing VPN connections on Linux
+Exec=$SCRIPT_DIR/vpn_manager.py
+Icon=$SCRIPT_DIR/assets/icon.svg
 Terminal=false
 Categories=Network;System;Settings;
 StartupWMClass=VPN Manager
 EOF
     
-    # Make desktop file executable
     chmod +x "$desktop_file"
     
     # Update desktop database
-    if command_exists update-desktop-database; then
+    if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "$HOME/.local/share/applications"
     fi
     
     print_success "Desktop entry created at $desktop_file"
-}
-
-# Function to create systemd service (optional)
-create_systemd_service() {
-    print_step "Creating systemd service (optional)..."
-    
-    local service_file="/etc/systemd/system/vpn-manager.service"
-    local install_dir="/opt/vpn-manager"
-    
-    # Check if we should install systemd service
-    read -p "Install systemd service for automatic startup? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Skipping systemd service installation"
-        return
-    fi
-    
-    # Check if running as root for systemd installation
-    if [ "$EUID" -ne 0 ]; then
-        echo -e "${YELLOW}Warning: systemd service installation requires root privileges${NC}"
-        echo "Please run this script with sudo or install the service manually"
-        return
-    fi
-    
-    # Create installation directory
-    mkdir -p "$install_dir"
-    
-    # Copy application files to installation directory
-    cp -r "$SCRIPT_DIR"/{main.py,backend,frontend,assets,requirements.txt} "$install_dir/"
-    
-    # Copy the systemd service file
-    if [ -f "$SCRIPT_DIR/vpn-manager.service" ]; then
-        cp "$SCRIPT_DIR/vpn-manager.service" "$service_file"
-    else
-        # Fallback: create service file
-        cat > "$service_file" <<EOF
-[Unit]
-Description=Linux VPN Manager
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 $install_dir/main.py
-WorkingDirectory=$install_dir
-Restart=on-failure
-RestartSec=5s
-Environment=DISPLAY=:0
-Environment=XDG_RUNTIME_DIR=/run/user/%i
-
-# For systems with polkit or policykit
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%i/bus
-
-# Security hardening
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=$install_dir /etc/vpn-manager /var/log/vpn-manager /run/user/%i
-
-# Allow access to network configuration
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_SYS_ADMIN
-AmbientCapabilities=CAP_NET_ADMIN
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    fi
-    
-    # Reload systemd and enable service
-    systemctl daemon-reload
-    systemctl enable vpn-manager.service
-    
-    print_success "Systemd service installed and enabled"
-    echo "To start the service, run: sudo systemctl start vpn-manager.service"
-    echo "To check status, run: sudo systemctl status vpn-manager.service"
 }
 
 # Function to create uninstall script
@@ -323,10 +178,6 @@ create_uninstall_script() {
     
     cat > "$SCRIPT_DIR/uninstall.sh" <<'EOF'
 #!/bin/bash
-
-# VPN Manager - Uninstall Script
-
-set -e
 
 echo "Uninstalling VPN Manager..."
 
@@ -338,22 +189,7 @@ if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$HOME/.local/share/applications"
 fi
 
-# Remove systemd service
-if [ -f "/etc/systemd/system/vpn-manager.service" ]; then
-    sudo systemctl stop vpn-manager.service 2>/dev/null || true
-    sudo systemctl disable vpn-manager.service 2>/dev/null || true
-    sudo rm -f "/etc/systemd/system/vpn-manager.service"
-    sudo systemctl daemon-reload
-    echo "Systemd service removed"
-fi
-
-# Remove installation directory
-if [ -d "/opt/vpn-manager" ]; then
-    sudo rm -rf "/opt/vpn-manager"
-    echo "Installation directory removed"
-fi
-
-# Remove user configuration
+# Remove configuration
 rm -rf "$HOME/.config/vpn-manager"
 rm -rf "$HOME/.local/share/vpn-manager"
 
@@ -373,11 +209,11 @@ display_summary() {
     echo "VPN Manager has been installed successfully!"
     echo ""
     echo "To run VPN Manager:"
-    echo "  1. From this directory: ./main.py"
+    echo "  1. From this directory: ./vpn_manager.py"
     echo "  2. Or use the desktop entry: VPN Manager"
     echo ""
     echo "Configuration files:"
-    echo "  - Connections: ~/.config/vpn-manager/connections.json"
+    echo "  - Profiles: ~/.config/vpn-manager/profiles.json"
     echo "  - Logs: ~/.local/share/vpn-manager/logs/"
     echo ""
     echo "To uninstall:"
@@ -393,7 +229,7 @@ main() {
     
     # Check Python version
     print_step "Checking Python version..."
-    if ! command_exists python3; then
+    if ! command -v python3 >/dev/null 2>&1; then
         print_error "Python 3 is not installed"
         exit 1
     fi
@@ -407,7 +243,7 @@ main() {
     
     # Check pip
     print_step "Checking pip..."
-    if ! command_exists pip3 && ! command_exists pip; then
+    if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
         print_error "pip is not installed"
         exit 1
     fi
@@ -415,9 +251,6 @@ main() {
     
     # Install system dependencies
     install_system_deps
-    
-    # Create assets
-    create_assets
     
     # Install Python dependencies
     install_python_deps

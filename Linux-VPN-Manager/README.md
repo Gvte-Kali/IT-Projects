@@ -1,20 +1,20 @@
 # VPN Manager
 
-A **cross-distribution**, **cross-desktop environment** GUI application for managing VPN connections (OpenVPN, WireGuard) on Linux. Built with **Python**, **PyQt6**, and standard Linux networking tools.
+A **simple**, **cross-distribution** GUI application for managing VPN connections (OpenVPN, WireGuard) on Linux. Built with **Python** and **Tkinter**.
 
 ## Features
 
-- **Cross-Platform**: Works on any Linux distribution with PyQt6 and standard networking tools
-- **Cross-DE**: Compatible with all major desktop environments (GNOME, KDE, XFCE, LXQt, etc.)
+- **Cross-Platform**: Works on any Linux distribution (Debian/Ubuntu, Fedora/RHEL, Arch)
+- **Cross-DE**: Compatible with all major desktop environments
 - **VPN Support**: OpenVPN (`.ovpn`) and WireGuard (`.conf`)
 - **System Tray Integration**: Control VPN connections directly from the system tray
-- **Connection Management**: Add, remove, edit, and manage VPN configurations
-- **Real-Time Logs**: View connection logs in real-time for each VPN
-- **Status Monitoring**: Visual status indicators (green/red/yellow) for active/inactive/connecting connections
-- **Auto-Refresh**: Automatic status updates every 5 seconds
-- **Error Handling**: Robust error handling for all operations
-- **Log Rotation**: Automatic log file rotation to prevent disk space issues
-- **Professional Logging**: System-wide logging with configurable levels
+- **Profile Management**: Add, remove, edit, and manage VPN configuration profiles
+- **Extra Arguments**: Add custom command line arguments to VPN connections
+- **Real-Time Status**: Visual status indicators for active/inactive/connecting connections
+- **DNS Leak Detection**: Automatically checks for DNS leaks while VPN is connected
+- **Auto-Reconnect**: Automatically reconnects if VPN connection drops
+- **Dark/Light Theme**: Toggle between dark and light themes
+- **Simple & Lightweight**: Single Python file with minimal dependencies
 
 ## Screenshots
 
@@ -30,12 +30,13 @@ The following system packages are required:
 - pip (Python package manager)
 - OpenVPN
 - WireGuard tools (`wg-quick`, `wg`)
-- `iproute2` (for `ip` command)
 - `sudo` (for elevated privileges)
+- `dig` or `nslookup` (for DNS leak detection, optional)
 
 ### Python Dependencies
 
-- PyQt6 >= 6.4.0
+- pystray (for system tray icon)
+- Pillow (for image handling)
 
 ## Installation
 
@@ -53,8 +54,7 @@ This will:
 2. Install all required system dependencies
 3. Install Python dependencies
 4. Create desktop entry
-5. Create assets (icons)
-6. Generate an uninstall script
+5. Create uninstall script
 
 ### Manual Installation
 
@@ -62,58 +62,40 @@ This will:
 
 ```bash
 # Debian/Ubuntu
-sudo apt install python3 python3-pip python3-venv openvpn wireguard-tools iproute2 sudo
+sudo apt install python3 python3-pip openvpn wireguard-tools sudo dnsutils
 
 # Fedora/RHEL
-sudo dnf install python3 python3-pip openvpn wireguard-tools which sudo
+sudo dnf install python3 python3-pip openvpn wireguard-tools which sudo bind-utils
 
 # Arch Linux
-sudo pacman -S python python-pip openvpn wireguard-tools which sudo
+sudo pacman -S python python-pip openvpn wireguard-tools which sudo bind
 
 # openSUSE
-sudo zypper install python3 python3-pip openvpn wireguard-tools which sudo
+sudo zypper install python3 python3-pip openvpn wireguard-tools which sudo bind-utils
 ```
 
 #### 2. Install Python Dependencies
 
 ```bash
-# Create virtual environment (optional but recommended)
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install requirements
-pip install -r requirements.txt
+pip3 install --user pystray Pillow
 ```
 
 #### 3. Run the Application
 
 ```bash
-# If using virtual environment
-source .venv/bin/activate
-python3 main.py
-
-# Or directly
-python3 main.py
-```
-
-### Install as a Python Package
-
-```bash
-# From the project directory
-pip install -e .
-
-# Then run
-vpn-manager
+python3 vpn_manager.py
 ```
 
 ## Usage
 
-### Adding a Connection
+### Adding a Profile
 
-1. Click "Add Connection" in the main window or from the File menu
-2. Enter a name for your connection (e.g., "My Work VPN")
+1. Click "Add Profile" in the Profiles tab or from the context menu
+2. Enter a name for your profile (e.g., "My Work VPN")
 3. Enter the path to your VPN configuration file (`.ovpn` or `.conf`)
-4. Click OK
+4. Select VPN type (auto-detected from file extension)
+5. Optionally add extra command line arguments
+6. Click OK
 
 **Note**: Configuration files must be readable by your user. For OpenVPN, ensure the file has the correct permissions:
 ```bash
@@ -122,37 +104,31 @@ chmod 600 /path/to/your/config.ovpn
 
 ### Connecting/Disconnecting
 
-- **From Main Window**: Double-click a connection or select it and click "Connect"/"Disconnect"
-- **From System Tray**: Right-click the tray icon and select your connection
+- **From Main Window**: Double-click a profile or select it and click "Connect"/"Disconnect"
+- **From System Tray**: Right-click the tray icon and select your profile
 - **Status Indicators**:
-  - 🟢 Green: Connected (UP)
-  - 🔴 Red: Disconnected (DOWN)
-  - 🟡 Yellow: Connecting
+  - `[OK]`: Connected
+  - `[...]`: Connecting
+  - `[X]`: Disconnected
+  - `[ERR]`: Failed
 
 ### Viewing Logs
 
-1. Select a connection in the main window
+1. Select a profile in the Connections tab
 2. Click "View Logs" button or right-click and select "View Logs"
-3. Logs will appear in a new window with auto-refresh
+3. Logs will appear in the Logs tab
 
-**Log Features**:
-- Auto-refresh (2s, 5s, 10s, or Off)
-- Manual refresh
-- Clear logs
-- Save logs to file
-- Scroll to bottom automatically
+### Editing a Profile
 
-### Editing a Connection
+1. Right-click a profile in the Profiles tab
+2. Select "Edit Profile"
+3. Update the name, config file path, VPN type, or extra arguments
+4. Click Save
 
-1. Right-click a connection in the main window
-2. Select "Edit"
-3. Update the name and/or configuration file path
-4. Click OK
+### Removing a Profile
 
-### Removing a Connection
-
-1. Select a connection in the main window
-2. Click "Remove Connection" or right-click and select "Remove"
+1. Select a profile in the Connections or Profiles tab
+2. Click "Remove" or right-click and select "Remove"
 3. Confirm the deletion
 
 **Note**: Active connections will be stopped before removal.
@@ -160,49 +136,72 @@ chmod 600 /path/to/your/config.ovpn
 ### System Tray Menu
 
 Right-click the VPN Manager tray icon to access:
-- Show VPN Manager: Open the main window
-- Connection list with status indicators
-- Status summary (e.g., "2 active / 5 total")
-- Quit: Exit the application
+- Profile list with status indicators
+- Add Profile
+- Toggle Theme
+- Show (open main window)
+- Quit
+
+### DNS Leak Detection
+
+The application automatically checks for DNS leaks every 30 seconds when a VPN is connected. If a leak is detected:
+- A warning will be shown in the UI
+- The DNS status label will turn red
+- The connection will show "LEAK" in the DNS column
+
+You can also manually check for DNS leaks by clicking "Check DNS Leak Now" in the Settings tab.
+
+### Auto-Reconnect
+
+If a VPN connection drops, the application will automatically attempt to reconnect up to 3 times (configurable in Settings tab).
+
+### Theme
+
+Toggle between dark and light themes:
+- Click "Toggle Dark/Light Theme" in the Settings tab
+- Or from the system tray menu
 
 ## Configuration
 
 ### Configuration Files
 
-- **Connections**: `~/.config/vpn-manager/connections.json`
-  - Stores all VPN connection configurations
-  - Format: `{"connection_name": {"path": "/path/to/config.ovpn", "type": "openvpn"}}`
+- **Profiles**: `~/.config/vpn-manager/profiles.json`
+  - Stores all VPN profile configurations
+  - Format: JSON with profile name as key
 
 - **Logs**: `~/.local/share/vpn-manager/logs/`
-  - Contains individual log files for each connection
-  - Log rotation: 5 files, 5MB each
+  - Contains main application log and per-profile logs
 
-- **Application Log**: `~/.local/share/vpn-manager/app.log`
-  - System-wide application logging
+- **Theme**: `~/.config/vpn-manager/theme.json`
+  - Stores theme preference
 
-### Environment Variables
+### Profile Format
 
-- `VPN_MANAGER_CONFIG_DIR`: Custom configuration directory (default: `~/.config/vpn-manager`)
-- `VPN_MANAGER_LOG_DIR`: Custom log directory (default: `~/.local/share/vpn-manager/logs`)
+Each profile in `profiles.json` has the following structure:
+
+```json
+{
+  "profile_name": {
+    "path": "/path/to/config.ovpn",
+    "type": "openvpn",
+    "extra_args": "--some-arg value",
+    "created": "2024-01-01T12:00:00"
+  }
+}
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### "Required icon files are missing"
+#### "pystray or Pillow not found"
 
-Run the install script to generate icons:
+Install the required Python packages:
 ```bash
-./install.sh
+pip3 install --user pystray Pillow
 ```
 
-Or manually create the `assets/` directory with the required icons:
-- `assets/icon.png` - Main application icon
-- `assets/green.png` - Connected status icon
-- `assets/red.png` - Disconnected status icon
-- `assets/yellow.png` - Connecting status icon
-
-#### "OpenVPN command not found"
+#### "openvpn command not found"
 
 Install OpenVPN:
 ```bash
@@ -230,11 +229,18 @@ sudo dnf install wireguard-tools
 sudo pacman -S wireguard-tools
 ```
 
-#### "ModuleNotFoundError: No module named 'PyQt6'"
+#### "sudo: command not found"
 
-Install PyQt6:
+Install sudo:
 ```bash
-pip install PyQt6
+# Debian/Ubuntu
+sudo apt install sudo
+
+# Fedora/RHEL
+sudo dnf install sudo
+
+# Arch Linux
+sudo pacman -S sudo
 ```
 
 #### VPN connection fails to start
@@ -243,17 +249,18 @@ pip install PyQt6
 - Check file permissions: `chmod 600 /path/to/config.ovpn`
 - Verify the configuration file path is correct
 - Check if `sudo` is properly configured for your user
+- Try running the VPN command manually to see the error
 
 ### Debug Mode
 
 Run with debug logging:
 ```bash
-python3 -m logging -v main.py
+python3 vpn_manager.py
 ```
 
 Or check the application log:
 ```bash
-cat ~/.local/share/vpn-manager/app.log
+cat ~/.local/share/vpn-manager/logs/vpn-manager.log
 ```
 
 ## Security Considerations
@@ -264,47 +271,50 @@ cat ~/.local/share/vpn-manager/app.log
 
 3. **Network Access**: VPN connections have full network access. Only use trusted configuration files.
 
-4. **Logging**: Connection logs may contain sensitive information. Logs are stored in `~/.local/share/vpn-manager/logs/` with rotation enabled.
+4. **Logging**: Connection logs may contain sensitive information. Logs are stored in `~/.local/share/vpn-manager/logs/`.
 
-## Development
-
-### Project Structure
+## Project Structure
 
 ```
 Linux-VPN-Manager/
-├── main.py                 # Main application entry point
-├── requirements.txt        # Python dependencies
-├── setup.py               # Python package setup
-├── install.sh             # Installation script
-├── uninstall.sh           # Uninstall script
-├── README.md              # This file
-├── .gitignore             # Git ignore rules
-├── assets/                # Icons and assets
-│   ├── icon.png           # Main icon
-│   ├── green.png          # Connected icon
-│   ├── red.png            # Disconnected icon
-│   └── yellow.png         # Connecting icon
-├── backend/
-│   ├── __init__.py
-│   ├── vpn_handler.py     # VPN connection management
-│   ├── config_manager.py  # Configuration management
-│   └── log_manager.py     # Logging management
-└── frontend/
+├── vpn_manager.py      # Main application entry point
+├── install.sh           # Installation script
+├── uninstall.sh         # Uninstall script (created by install.sh)
+├── requirements.txt     # Python dependencies
+├── README.md            # This file
+├── LICENSE              # License file
+├── assets/              # Icons and assets
+│   ├── icon.svg
+│   ├── green.svg
+│   ├── red.svg
+│   └── yellow.svg
+└── src/                # Source modules
     ├── __init__.py
-    ├── main_window.py     # Main GUI window
-    ├── tray_icon.py        # System tray icon
-    └── log_viewer.py      # Log viewer dialog
+    ├── config.py        # Configuration and constants
+    ├── profile_manager.py  # Profile management
+    ├── vpn_handler.py   # VPN connection handling
+    ├── theme_manager.py # Theme management
+    └── tray_icon.py     # System tray icon
 ```
 
-### Running Tests
+## Development
+
+### Running
 
 ```bash
-# Install test dependencies
-pip install pytest pytest-qt
+# Run the application
+python3 vpn_manager.py
 
-# Run tests
-pytest
+# Or with Python path
+PYTHONPATH=./src python3 vpn_manager.py
 ```
+
+### Testing
+
+The application has been tested on:
+- Arch Linux
+- Ubuntu
+- Fedora
 
 ### Contributing
 
@@ -314,21 +324,15 @@ pytest
 4. Push to the branch (`git push origin feature/your-feature`)
 5. Open a Pull Request
 
-### Code Style
-
-- Follow PEP 8 guidelines
-- Use type hints where appropriate
-- Include docstrings for all public methods
-- Use logging instead of print statements
-- Handle exceptions gracefully
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- [PyQt6](https://www.riverbankcomputing.com/static/Docs/PyQt6/) - Python bindings for Qt
+- [Tkinter](https://docs.python.org/3/library/tkinter.html) - Python GUI framework
+- [pystray](https://github.com/moses-palmer/pystray) - System tray icon support
+- [Pillow](https://python-pillow.org/) - Image handling
 - [OpenVPN](https://openvpn.net/) - Open source VPN solution
 - [WireGuard](https://www.wireguard.com/) - Fast, modern, secure VPN tunnel
 
