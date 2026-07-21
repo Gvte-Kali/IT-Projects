@@ -1,6 +1,3 @@
-# VPN Manager - Git Ignore
-# ========================
-
 # Python
 __pycache__/
 *.py[cod]
@@ -37,20 +34,24 @@ ENV/
 *.swo
 *~
 
-# System files
+# System
 .DS_Store
 Thumbs.db
 
-# User configuration and logs
-/.config/vpn-manager/
-/.local/share/vpn-manager/
+# Logs
+*.log
+logs/
 
-# Installer build
-*.deb
-*.rpm
-*.tar.gz
-*.zip
+# Configuration
+.config/
+.profiles.json
+.profiles.json.bak
 
-# Generated assets (keep SVG icons in repo)
-assets/*.png
-assets/*.jpg
+# Local share
+.local/
+
+# Install script
+uninstall.sh
+
+# Desktop entry
+*.desktop
