@@ -22,7 +22,7 @@ Each project is designed to be **modular, efficient, and production-ready**.
    **Project**          | **Description**                                                                                     | **Language**       | **Status**          |
  |----------------------|-----------------------------------------------------------------------------------------------------|--------------------|---------------------|
   | **[AirGappedCVEs](https://github.com/Gvte-Kali/AirGappedCVE)**       | Asset & Vulnerability Manager for Air-Gapped Environments               | Shell, Python, HTML      | ✅ Active           |
- | **[[Linux-VPN-Manager](Linux-VPN-Manager)](https://github.com/Gvte-Kali/Linux-VPN-Manager)** | A **cross-DE GUI** for managing OpenVPN/WireGuard connections with system tray integration.       | Python (Tkinter)     | WORK IN PROGRESS           |
+ | **[Linux-VPN-Manager](https://github.com/Gvte-Kali/Linux-VPN-Manager)** | A **cross-DE GUI** for managing OpenVPN/WireGuard connections with system tray integration.       | Python (Tkinter)     | WORK IN PROGRESS           |
  | **[SecurepathVPN](https://github.com/Gvte-Kali/SecurepathVPN)**       | Automated **PiVPN deployment** with Tailscale fallback, VNC, and Discord notifications.               | Shell, Python      | WORK IN PROGRESS           |
 
 
