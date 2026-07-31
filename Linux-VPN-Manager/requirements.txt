@@ -1,6 +1,0 @@
-# VPN Manager - Python Dependencies
-# ================================
-
-# Core GUI framework
-pystray>=0.19.0  # For system tray icon
-Pillow>=9.0.0   # For image handling in system tray
