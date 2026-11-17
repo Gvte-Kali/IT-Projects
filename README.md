@@ -1,6 +1,6 @@
 # 🗂️ IT-Projects
 
-A catalogue of 10 projects on my [GitHub account](https://github.com/Gvte-Kali?tab=repositories), grouped by purpose. IT-Projects is the central index for their descriptions, technologies, statuses and documentation.
+A catalogue of all of projects on my [GitHub account](https://github.com/Gvte-Kali?tab=repositories), grouped by purpose. IT-Projects is the central index for their descriptions, technologies, statuses and documentation.
 
 ## 🗂️ Projects
 
