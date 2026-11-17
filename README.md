@@ -16,7 +16,7 @@ An index of all 11 repositories on my [GitHub account](https://github.com/Gvte-K
 | [Twenty_Tools](https://github.com/Gvte-Kali/Twenty_Tools) | SSH/SFTP file manager with local and remote browsing, file transfers, and an integrated editor. | Python, Tkinter, Paramiko, Shell | ✅ Working | [README](https://github.com/Gvte-Kali/Twenty_Tools#readme) |
 | [Vigil](https://github.com/Gvte-Kali/vigil) | Linux application for digital media analysis, threat scanning, disk imaging, and PDF reporting. | Python, Shell | ✅ Working | [GitHub Pages](https://gvte-kali.github.io/vigil/) |
 | [VLC-Camera-Manager](https://github.com/Gvte-Kali/VLC-Camera-Manager) | IP camera and playlist manager with RTSP stream testing and VLC playback. | Python, Tkinter | 🚧 Work in progress | [README](https://github.com/Gvte-Kali/VLC-Camera-Manager#readme) |
-| [Whistor](https://github.com/Gvte-Kali/Whistor) | Self-hosted Matrix/Synapse server exposed through a Tor hidden service, with deployment and management scripts. | Shell, Docker Compose, Tor, Synapse | ✅ Working | [README](https://github.com/Gvte-Kali/Whistor#readme) |
+| [Whistor](https://github.com/Gvte-Kali/Whistor) | Self-hosted Matrix/Synapse server over Tor, with web user administration via LAN, Tailscale or SSH. | Shell, Docker Compose, Tor, Synapse, Ketesa, Nginx | ✅ Working | [GitHub Pages](https://gvte-kali.github.io/Whistor/) |
 
 The documentation column links to each project's GitHub Pages site when available. Otherwise, links point to the project's README or its component READMEs. BadStuffHosting has no root README; its documentation is stored in the linked subdirectories.
 
