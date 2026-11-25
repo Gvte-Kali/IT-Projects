@@ -14,7 +14,7 @@ Security assessment, vulnerability management and investigation tools.
 | [BadStuffHosting](https://github.com/Gvte-Kali/BadStuffHosting) | Collection of BadUSB proofs of concept, network reconnaissance scripts, and Windows security resources. | PowerShell, Shell | ✅ Working | [BadUSB README](https://github.com/Gvte-Kali/BadStuffHosting/blob/main/BadUSB/W1ns1d3r/readme.md) · [Netrecon README](https://github.com/Gvte-Kali/BadStuffHosting/blob/main/Netrecon/README.md) · [Windows README](https://github.com/Gvte-Kali/BadStuffHosting/blob/main/Windows/AdminBypassNoLogin/readme.md) |
 | [ExeFlow](https://github.com/Gvte-Kali/Exeflow) | Pentest command orchestrator with reusable variables, command sequences, and shareable playbooks. | Python, Tkinter, Shell | ✅ Working | [README](https://github.com/Gvte-Kali/Exeflow#readme) |
 | [Exegol-launch](https://github.com/Gvte-Kali/Exegol-launch) | Graphical application launcher for discovering and running tools inside Exegol containers. | Python, Tkinter, Shell | 🧪 Need tests | [README](https://github.com/Gvte-Kali/Exegol-launch#readme) |
-| [Vigil](https://github.com/Gvte-Kali/vigil) | Linux application for digital media analysis, threat scanning, disk imaging, and PDF reporting. | Python, Shell | ✅ Working | [GitHub Pages](https://gvte-kali.github.io/vigil/) |
+| [Vigil](https://github.com/Gvte-Kali/vigil) | Linux application for digital media analysis, threat scanning, disk imaging, and PDF reporting. | Python, Shell | ✅ V1.0 Working, but working for V 2.0 | [GitHub Pages](https://gvte-kali.github.io/vigil/) |
 
 ### 🔐 Privacy & Communication
 
